@@ -1,0 +1,166 @@
+﻿<div class="min-h-full w-full bg-[#f5f5f5] px-4 py-4 font-sans text-[#4d4d4d] sm:px-5 lg:px-6">
+  <div class="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+    <div class="min-w-0">
+      <h1 class="text-[17px] font-semibold leading-6 text-[#505050]">Admin's List</h1>
+      <p class="mt-1 text-[12px] text-[#777]">Manage admin profiles, personal details, and account preferences with ease.</p>
+    </div>
+
+    <div class="relative self-start sm:self-center">
+      <button type="button" (click)="toggleBulkMenu()"
+        class="flex h-9 min-w-[114px] items-center justify-between gap-5 rounded-full bg-white px-4 text-[10px] text-[#555] shadow-sm transition hover:bg-[#fafafa]">
+        {{ selectedIds().length ? 'Bulk Actions (' + selectedIds().length + ')' : 'Bulk Users' }}
+        <svg class="h-3 w-3" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m5 7 5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      @if (bulkMenuOpen()) {
+        <div class="absolute right-0 top-11 z-30 w-44 overflow-hidden rounded-xl border border-[#ededed] bg-white py-1 shadow-lg">
+          <button type="button" (click)="applyBulkStatus('Active')" [disabled]="!selectedIds().length" class="block w-full px-4 py-2.5 text-left text-[11px] hover:bg-[#f7f7f7] disabled:opacity-40">Set Active</button>
+          <button type="button" (click)="applyBulkStatus('Inactive')" [disabled]="!selectedIds().length" class="block w-full px-4 py-2.5 text-left text-[11px] hover:bg-[#f7f7f7] disabled:opacity-40">Set Inactive</button>
+          <button type="button" (click)="bulkDelete()" [disabled]="!selectedIds().length" class="block w-full px-4 py-2.5 text-left text-[11px] text-red-600 hover:bg-red-50 disabled:opacity-40">Remove selected</button>
+        </div>
+      }
+    </div>
+  </div>
+
+  @if (successMessage()) {
+    <div class="fixed right-5 top-5 z-[100] rounded-xl bg-[#278b70] px-4 py-3 text-xs text-white shadow-lg" role="status">{{ successMessage() }}</div>
+  }
+  @if (errorMessage()) {
+    <div class="mb-3 rounded-lg border border-red-100 bg-red-50 px-4 py-2.5 text-xs text-red-600" role="alert">{{ errorMessage() }}</div>
+  }
+
+  <section class="overflow-visible rounded-[14px] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.025)]">
+    <div class="flex flex-col gap-3 border-b border-[#f0f0f0] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+      <div class="flex items-center gap-3">
+        <label class="flex h-8 min-w-0 items-center gap-2 rounded-full bg-[#f7f7f7] px-3 sm:w-[260px]">
+          <svg class="h-3.5 w-3.5 shrink-0 text-[#999]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+          <input type="search" placeholder="Search admins" [value]="searchTerm()" (input)="onSearch($any($event.target).value)"
+            class="w-full border-0 bg-transparent text-[11px] outline-none placeholder:text-[#aaa]" aria-label="Search administrators" />
+        </label>
+        <select [value]="statusFilter()" (change)="onStatusFilter($any($event.target).value)"
+          class="h-8 rounded-full border-0 bg-[#f7f7f7] px-3 text-[11px] text-[#666] outline-none">
+          <option value="All">All Status</option>
+          <option value="Active">Active</option>
+          <option value="Inactive">Inactive</option>
+        </select>
+      </div>
+      <span class="text-[10px] text-[#999]">{{ totalElements() }} administrators</span>
+    </div>
+
+    @if (loading()) {
+      <div class="grid min-h-[320px] place-items-center text-xs text-[#999]">
+        <div class="flex items-center gap-2"><span class="h-4 w-4 animate-spin rounded-full border-2 border-[#ddd] border-t-[#777]"></span>Loading administratorsâ€¦</div>
+      </div>
+    } @else if (loadError()) {
+      <div class="flex min-h-[320px] flex-col items-center justify-center gap-3 px-5 text-center">
+        <p class="text-xs text-[#777]">{{ loadError() }}</p>
+        <button type="button" (click)="loadAdmins()" class="rounded-full bg-[#4d4d4d] px-5 py-2 text-[11px] text-white hover:bg-black">Try again</button>
+      </div>
+    } @else if (!visibleAdmins().length) {
+      <div class="grid min-h-[280px] place-items-center px-5 text-center text-xs text-[#999]">No administrators found.</div>
+    } @else {
+      <div class="h-[500px] overflow-x-auto ">
+        <table class="w-full min-w-[760px] table-fixed border-collapse text-left text-[12px]">
+          <colgroup>
+            <col class="w-[5%]"><col class="w-[18%]"><col class="w-[23%]"><col class="w-[17%]"><col class="w-[17%]"><col class="w-[20%]">
+          </colgroup>
+          <thead>
+            <tr class="h-[48px] border-b border-[#f0f0f0] text-[#333]">
+              <th class="px-4 font-medium"><input type="checkbox" [checked]="allVisibleSelected()" (change)="toggleSelectAll($any($event.target).checked)" aria-label="Select all administrators" class="h-3 w-3 cursor-pointer rounded border-[#d8d8d8] accent-[#555]"></th>
+              <th class="px-2 font-medium">Username</th>
+              <th class="px-2 font-medium">Email</th>
+              <th class="px-2 font-medium">Organization</th>
+              <th class="px-2 font-medium">Status</th>
+              <th class="px-4 text-right font-medium">More Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (admin of visibleAdmins(); track admin.id) {
+              <tr class="h-[42px] border-b border-[#f7f7f7] last:border-0 hover:bg-[#fcfcfc]">
+                <td class="px-4">
+                  <input type="checkbox" [checked]="selectedIds().includes(admin.id)" (change)="toggleSelection(admin.id, $any($event.target).checked)"
+                    [attr.aria-label]="'Select ' + formatName(admin)" class="h-3 w-3 cursor-pointer rounded border-[#d8d8d8] accent-[#555]">
+                </td>
+                <td class="px-2">
+                  <div class="flex min-w-0 items-center gap-2">
+                    <span class="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[#e9edef] text-[8px] font-semibold text-[#5e727a]">{{ formatName(admin).charAt(0).toUpperCase() }}</span>
+                    <span class="truncate">{{ formatName(admin) }}</span>
+                  </div>
+                </td>
+                <td class="truncate px-2" [title]="admin.email">{{ admin.email }}</td>
+                <td class="truncate px-2">Vativa Hub</td>
+                <td class="px-2">
+                  <span class="inline-flex items-center gap-1.5">
+                    <span class="h-1.5 w-1.5 rounded-full" [class]="admin.status === 'Active' ? 'bg-[#49a77c]' : 'bg-[#d68a80]'"></span>
+                    {{ admin.status }}
+                  </span>
+                </td>
+                <td class="relative px-4 text-right">
+                  <button type="button" (click)="toggleActionMenu(admin)" [attr.aria-expanded]="openActionId() === admin.id"
+                    [attr.aria-label]="'More actions for ' + formatName(admin)"
+                    class="inline-grid h-7 w-7 place-items-center rounded-full bg-[#f6f6f6] text-[#777] transition hover:bg-[#eaeaea] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#bbb]">
+                    <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><circle cx="10" cy="4" r="1.5"/><circle cx="10" cy="10" r="1.5"/><circle cx="10" cy="16" r="1.5"/></svg>
+                  </button>
+
+                  @if (openActionId() === admin.id) {
+                    <div class="absolute right-10 top-6 z-40 w-[218px] overflow-hidden rounded-[13px] border border-[#ededed] bg-white text-left shadow-[0_8px_28px_rgba(0,0,0,0.12)]">
+                      <button type="button" (click)="openEditProfile(admin)" class="block w-full border-b border-[#f0f0f0] px-4 py-3 text-left text-[11px] hover:bg-[#f8f8f8]">Edit Profile</button>
+                      <div class="border-b border-[#ededed] px-3 py-2.5">
+                        <label class="flex cursor-pointer items-center gap-2 text-[11px]">
+                          <input type="checkbox" [checked]="statusDraft()?.suspend ?? false" (change)="updateStatusDraft('suspend', $any($event.target).checked)" class="h-3 w-3 accent-[#555]">
+                          Suspend Admin
+                        </label>
+                        <div class="mt-2 grid grid-cols-2 gap-2">
+                          <label class="text-[9px] text-[#999]">Start Date
+                            <input type="date" [disabled]="!statusDraft()?.suspend" [value]="statusDraft()?.startDate ?? ''" (change)="updateStatusDraft('startDate', $any($event.target).value)"
+                              class="mt-1 h-7 w-full rounded-md border border-[#ededed] px-1 text-[9px] text-[#555] disabled:bg-[#fafafa] disabled:text-[#bbb]">
+                          </label>
+                          <label class="text-[9px] text-[#999]">End Date
+                            <input type="date" [disabled]="!statusDraft()?.suspend" [min]="statusDraft()?.startDate ?? ''" [value]="statusDraft()?.endDate ?? ''" (change)="updateStatusDraft('endDate', $any($event.target).value)"
+                              class="mt-1 h-7 w-full rounded-md border border-[#ededed] px-1 text-[9px] text-[#555] disabled:bg-[#fafafa] disabled:text-[#bbb]">
+                          </label>
+                        </div>
+                      </div>
+                      <div class="space-y-0.5 border-b border-[#ededed] px-3 py-2">
+                        <label class="flex cursor-pointer items-center gap-2 py-1 text-[11px]">
+                          <input type="radio" name="admin-status-{{admin.id}}" [checked]="statusDraft()?.status === 'Active'" (change)="updateStatusDraft('status', 'Active')" class="h-3 w-3 accent-[#555]"> Active
+                        </label>
+                        <label class="flex cursor-pointer items-center gap-2 py-1 text-[11px]">
+                          <input type="radio" name="admin-status-{{admin.id}}" [checked]="statusDraft()?.status === 'Inactive'" (change)="updateStatusDraft('status', 'Inactive')" class="h-3 w-3 accent-[#555]"> Inactive
+                        </label>
+                        <button type="button" (click)="requestDelete(admin)" class="flex w-full items-center gap-2 py-1.5 text-left text-[11px] text-[#a44d4d] hover:text-red-700">
+                          <span class="h-3 w-3 rounded-sm border border-[#d8bcbc]"></span> Delete Admin
+                        </button>
+                      </div>
+                      <div class="flex justify-end gap-2 px-3 py-2.5">
+                        <button type="button" (click)="closeActionMenu()" class="rounded-md bg-[#f5f5f5] px-3 py-1.5 text-[9px] text-[#666] hover:bg-[#ededed]">Cancel</button>
+                        <button type="button" (click)="saveStatus(admin)" class="rounded-md bg-[#f5f5f5] px-3 py-1.5 text-[9px] text-[#555] hover:bg-[#e8e8e8]">Save</button>
+                      </div>
+                    </div>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    
+    }
+  </section>
+</div>
+
+@if (confirmAction(); as confirmation) {
+  <div class="fixed inset-0 z-[90] grid place-items-center bg-black/35 p-4 backdrop-blur-[2px]" (click)="cancelConfirmation()">
+    <section class="w-full max-w-[370px] rounded-2xl bg-white p-6 text-center shadow-2xl" role="alertdialog" aria-modal="true" (click)="$event.stopPropagation()">
+      <div class="mx-auto grid h-10 w-10 place-items-center rounded-full bg-[#fff2ef] text-lg text-[#c56b5c]">{{ confirmation.type === 'delete' ? '!' : '!' }}</div>
+      <h3 class="mt-3 text-base font-semibold text-[#4d4d4d]">{{ confirmation.type === 'delete' ? 'Delete administrator?' : 'Deactivate administrator?' }}</h3>
+      <p class="mt-2 text-xs leading-5 text-[#888]">
+        @if (confirmation.type === 'delete') { Are you sure you want to permanently delete {{ formatName(confirmation.admin) }}? }
+        @else { {{ formatName(confirmation.admin) }} will lose access to the platform. Continue? }
+      </p>
+      <div class="mt-5 flex justify-center gap-2">
+        <button type="button" (click)="cancelConfirmation()" class="h-9 rounded-lg bg-[#f4f4f4] px-5 text-xs text-[#666]">Cancel</button>
+        <button type="button" (click)="confirmStatusAction()" class="h-9 rounded-lg bg-[#c65e54] px-5 text-xs text-white hover:bg-[#ad493f]">{{ confirmation.type === 'delete' ? 'Delete Admin' : 'Confirm' }}</button>
+      </div>
+    </section>
+  </div>
+}

@@ -58,6 +58,12 @@ export const routes: Routes = [
             ),
           title: 'Dashboard',
         },
+        {
+          path: 'admin-list',
+          loadComponent: () =>
+            import('./admin-management/admin-list/admin-list').then((m) => m.AdminList),
+          title: 'Admin List',
+        },
 
 
       { path: '', redirectTo: 'package', pathMatch: 'full' },
