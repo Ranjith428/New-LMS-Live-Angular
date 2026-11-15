@@ -1,0 +1,112 @@
+@if (t(); as b) {
+  @if (store.page() === 0) {
+    <div class="grid grid-cols-2 items-start gap-[19px]">
+      <div class="flex flex-col gap-[14px]">
+        <app-card title="Ebook Text Type" [minHeight]="114">
+          <app-row label="Type">
+            <app-select [value]="b.type" [options]="types" (changed)="store.updateText({ type: $any($event) })" />
+          </app-row>
+        </app-card>
+
+        <app-card title="Text Content">
+          <div class="-mt-[2px] flex items-center gap-[5px] text-[#555555]" (mousedown)="$event.preventDefault()">
+            <div class="relative">
+              <button type="button" class="tool flex !w-[28px] items-center gap-[1px]" title="Alignment" (click)="alignOpen.set(!alignOpen())">
+                <app-icon [name]="currentAlign()" class="size-[13px]" />
+                <app-icon name="chevron-down" class="size-[8px]" />
+              </button>
+              @if (alignOpen()) {
+                <div class="absolute left-0 top-[24px] z-20 flex gap-1 rounded-lg bg-white p-1 shadow-lg ring-1 ring-black/5">
+                  @for (a of aligns; track a.value) {
+                    <button type="button" class="tool" [class.!bg-[#6ec4cb]]="b.align === a.value" (click)="setAlign(a.value)">
+                      <app-icon [name]="a.icon" class="size-[13px]" />
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+            <button type="button" class="tool" title="Insert table" (click)="insertTable()"><app-icon name="table" class="size-[13px]" /></button>
+            <label class="tool relative cursor-pointer" title="Text colour">
+              <app-icon name="font-color" class="size-[13px]" />
+              <input type="color" class="absolute inset-0 cursor-pointer opacity-0" (mousedown)="saveRange()" (input)="foreColor($any($event.target).value)" />
+            </label>
+            <button type="button" class="tool" title="Highlight" (click)="highlight()"><app-icon name="pencil" class="size-[13px]" /></button>
+            <button type="button" class="tool" title="Link" (click)="link()"><app-icon name="link" class="size-[13px]" /></button>
+            <button type="button" class="tool" title="Clear formatting" (click)="exec('removeFormat')"><app-icon name="clear" class="size-[13px]" /></button>
+            <button type="button" class="tool text-[10px]" title="Insert variable" (click)="insertVariable()">(x)</button>
+            <button type="button" class="tool" title="Code" (click)="code()"><app-icon name="code" class="size-[13px]" /></button>
+            <button type="button" class="tool font-bold" title="Bold" (click)="exec('bold')">B</button>
+            <button type="button" class="tool line-through" title="Strikethrough" (click)="exec('strikeThrough')">S</button>
+            <button type="button" class="tool underline" title="Underline" (click)="exec('underline')">U</button>
+            <button type="button" class="tool italic" title="Italic" (click)="exec('italic')">I</button>
+            <button type="button" class="tool text-[11px]" title="Superscript" (click)="exec('superscript')">x<sup class="text-[7px]">2</sup></button>
+            <button type="button" class="tool text-[11px]" title="Subscript" (click)="exec('subscript')">x<sub class="text-[7px]">2</sub></button>
+            <button type="button" class="tool" title="Bulleted list" (click)="exec('insertUnorderedList')"><app-icon name="list" class="size-[13px]" /></button>
+          </div>
+          <div
+            #editor
+            contenteditable="true"
+            data-placeholder="Enter Text"
+            spellcheck="false"
+            class="ebook-rich ebook-scroll mt-[4px] max-h-[96px] min-h-[34px] overflow-auto text-[14px] leading-[20px] text-[#555555] outline-none"
+            (input)="onEdit()"
+            (blur)="saveRange()"
+          ></div>
+        </app-card>
+      </div>
+
+      <div class="flex flex-col gap-[11px]">
+        <app-card title="Font Properties" [minHeight]="117">
+          <app-row label="Font Family">
+            <app-select [value]="b.fontFamily" [options]="fonts" (changed)="store.updateText({ fontFamily: $event })" />
+          </app-row>
+          <app-row label="Opacity">
+            <app-number suffix="%" [min]="0" [max]="100" [value]="b.opacity" (changed)="store.updateText({ opacity: $event })" />
+          </app-row>
+        </app-card>
+
+        <app-card title="Text Color">
+          <app-row label="Color" [width]="null">
+            <app-color [value]="b.color" (changed)="store.updateText({ color: $event })" />
+          </app-row>
+          @if (b.type === 'button') {
+            <app-row label="Background" [width]="null">
+              <app-color [value]="b.bg ?? { r: 110, g: 196, b: 203, a: 100 }" (changed)="store.updateText({ bg: $event })" />
+            </app-row>
+          }
+        </app-card>
+      </div>
+    </div>
+  } @else {
+    <div class="grid grid-cols-2 items-start gap-[19px]">
+      <app-card title="Text Shadows">
+        <div class="-mt-[2px] flex justify-between">
+          @for (p of presets; track p.value) {
+            <button
+              type="button"
+              class="flex h-[42px] w-[52px] flex-col items-center justify-center rounded-lg bg-[#f1f1f1] text-[#555555] transition hover:bg-[#e9e9e9]"
+              [class.ring-2]="b.shadow.preset === p.value"
+              [class.ring-[#6ec4cb]]="b.shadow.preset === p.value"
+              (click)="store.applyShadowPreset(p.value)"
+            >
+              <span class="text-[12px] font-medium leading-[14px]" [style.text-shadow]="p.shadow">TEXT</span>
+              <span class="text-[8px] leading-[10px]">{{ p.label }}</span>
+            </button>
+          }
+        </div>
+        <app-row label="Horizontal Offset">
+          <app-number suffix="px" [value]="b.shadow.x" (changed)="setShadow({ x: $event })" />
+        </app-row>
+        <app-row label="Vertical Offset">
+          <app-number suffix="px" [value]="b.shadow.y" (changed)="setShadow({ y: $event })" />
+        </app-row>
+        <app-row label="Color" [width]="null">
+          <app-color [value]="b.shadow.color" (changed)="setShadow({ color: $event })" />
+        </app-row>
+        <app-row label="Blur">
+          <app-number suffix="px" [min]="0" [value]="b.shadow.blur" (changed)="setShadow({ blur: $event })" />
+        </app-row>
+      </app-card>
+    </div>
+  }
+}

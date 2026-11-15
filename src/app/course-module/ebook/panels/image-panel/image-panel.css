@@ -1,0 +1,13 @@
+.btn {
+  display: inline-flex;
+  height: 22px;
+  align-items: center;
+  gap: 4px;
+  border-radius: 6px;
+  background: #f1f1f1;
+  padding: 0 9px;
+  font-size: 10px;
+  color: #555;
+  cursor: pointer;
+}
+.btn:hover { background: #6ec4cb; color: #fff; }

@@ -1,0 +1,13 @@
+.tool {
+  display: inline-flex;
+  height: 18px;
+  width: 15px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1;
+  color: #555;
+  cursor: pointer;
+}
+.tool:hover { background: #ececec; }

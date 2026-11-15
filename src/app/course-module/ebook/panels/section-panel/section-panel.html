@@ -1,0 +1,101 @@
+@if (s(); as sec) {
+  @if (store.page() === 0) {
+    <div class="grid grid-cols-2 items-start gap-[19px]">
+      <div class="flex flex-col gap-[14px]">
+        <app-card title="Section Layout" [minHeight]="114">
+          <app-row label="Columns">
+            <app-select [value]="sec.cols" [options]="colOptions" (changed)="store.updateSection({ cols: +$event })" />
+          </app-row>
+          <app-row label="Alignment">
+            <app-select [value]="sec.align" [options]="alignOptions" (changed)="store.updateSection({ align: $any($event) })" />
+          </app-row>
+          <app-row label="Width">
+            <app-select [value]="sec.boxed ? 'boxed' : 'full'" [options]="widthOptions" (changed)="store.updateSection({ boxed: $event === 'boxed' })" />
+          </app-row>
+        </app-card>
+
+        <app-card title="Elements">
+          <div class="flex flex-wrap gap-[6px]">
+            <button type="button" class="btn" (click)="store.addBlock('text')"><app-icon name="plus" class="size-[10px]" /> Text</button>
+            <button type="button" class="btn" (click)="store.addBlock('image')"><app-icon name="plus" class="size-[10px]" /> Image</button>
+          </div>
+          <div class="flex flex-wrap gap-[6px]">
+            <button type="button" class="btn" title="Move up" (click)="store.moveSection(sec.id, -1)"><app-icon name="up" class="size-[10px]" /> Up</button>
+            <button type="button" class="btn" title="Move down" (click)="store.moveSection(sec.id, 1)"><app-icon name="down" class="size-[10px]" /> Down</button>
+            <button type="button" class="btn" (click)="store.duplicateSection(sec.id)"><app-icon name="copy" class="size-[10px]" /> Duplicate</button>
+            <button type="button" class="btn !text-[#f2554a]" (click)="store.deleteSection(sec.id)"><app-icon name="trash" class="size-[10px]" /> Delete</button>
+          </div>
+        </app-card>
+      </div>
+
+      <div class="flex flex-col gap-[11px]">
+        <app-card title="Background" [minHeight]="117">
+          <app-row label="Type">
+            <app-select [value]="sec.bgMode" [options]="bgOptions" (changed)="store.updateSection({ bgMode: $any($event) })" />
+          </app-row>
+          @switch (sec.bgMode) {
+            @case ('color') {
+              <app-row label="Color" [width]="null">
+                <app-color [value]="sec.bgColor" (changed)="store.updateSection({ bgColor: $event })" />
+              </app-row>
+            }
+            @case ('gradient') {
+              <app-row label="From" [width]="null">
+                <app-color [value]="sec.gradFrom" (changed)="store.updateSection({ gradFrom: $event })" />
+              </app-row>
+              <app-row label="To" [width]="null">
+                <app-color [value]="sec.gradTo" (changed)="store.updateSection({ gradTo: $event })" />
+              </app-row>
+              <app-row label="Angle">
+                <app-number suffix="deg" [min]="0" [max]="360" [value]="sec.gradAngle" (changed)="store.updateSection({ gradAngle: $event ?? 0 })" />
+              </app-row>
+            }
+            @case ('image') {
+              <label class="btn cursor-pointer">
+                <app-icon name="upload" class="size-[10px]" /> {{ sec.bgImage ? 'Replace image' : 'Upload image' }}
+                <input type="file" accept="image/*" class="hidden" (change)="pickBg($event)" />
+              </label>
+            }
+          }
+        </app-card>
+
+        <app-card title="Spacing">
+          <app-row label="Padding X">
+            <app-number suffix="px" [min]="0" [value]="sec.padX" (changed)="store.updateSection({ padX: $event })" />
+          </app-row>
+          <app-row label="Padding Y">
+            <app-number suffix="px" [min]="0" [value]="sec.padY" (changed)="store.updateSection({ padY: $event })" />
+          </app-row>
+          <app-row label="Gap">
+            <app-number suffix="px" [min]="0" [value]="sec.gap" (changed)="store.updateSection({ gap: $event })" />
+          </app-row>
+          <app-row label="Min height">
+            <app-number suffix="px" [min]="0" [value]="sec.minHeight" (changed)="store.updateSection({ minHeight: $event })" />
+          </app-row>
+        </app-card>
+      </div>
+    </div>
+  } @else {
+    <div class="grid grid-cols-2 items-start gap-[19px]">
+      <app-card title="Border">
+        <app-row label="Width">
+          <app-number suffix="px" [min]="0" [value]="sec.borderWidth" (changed)="store.updateSection({ borderWidth: $event })" />
+        </app-row>
+        <app-row label="Color" [width]="null">
+          <app-color [value]="sec.borderColor" (changed)="store.updateSection({ borderColor: $event })" />
+        </app-row>
+        <app-row label="Radius">
+          <app-number suffix="px" [min]="0" [value]="sec.radius" (changed)="store.updateSection({ radius: $event })" />
+        </app-row>
+      </app-card>
+      <app-card title="Effects">
+        <app-row label="Shadow">
+          <app-select [value]="sec.shadow" [options]="shadowOptions" (changed)="store.updateSection({ shadow: $any($event) })" />
+        </app-row>
+        <app-row label="Glass card">
+          <app-select [value]="sec.glass ? 'on' : 'off'" [options]="onOff" (changed)="store.updateSection({ glass: $event === 'on' })" />
+        </app-row>
+      </app-card>
+    </div>
+  }
+}

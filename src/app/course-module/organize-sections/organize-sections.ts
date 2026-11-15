@@ -704,6 +704,11 @@ export class OrganizeSections implements OnInit, AfterViewInit, OnDestroy {
       if (activity) this.openQuestionBankList(sectionId, activity);
       return;
     }
+    // Add Activity -> Ebook opens the ebook editor page
+    if (kind === 'Ebook') {
+      this.goToEbook(sectionId);
+      return;
+    }
     if (kind !== 'Multimedia') {
       this.showToast(`${kind} upload will be available soon.`);
       return;
@@ -862,6 +867,10 @@ export class OrganizeSections implements OnInit, AfterViewInit, OnDestroy {
         },
         error: (err: unknown) => this.showToast(toUiError(err).message),
       });
+  }
+
+  private goToEbook(sectionId: number): void {
+    void this.router.navigate(['/admin-dashboard', 'courses', this.course.id, 'sections', sectionId, 'ebook']);
   }
 
   private goToBank(sectionId: number, bankId: number): void {

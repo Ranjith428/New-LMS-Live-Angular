@@ -1,5 +1,4 @@
 import { Routes } from '@angular/router';
-
 import {
   adminAreaGuard,
   adminHomeGuard,
@@ -188,6 +187,15 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./course-module/quiz-attempt/quiz-attempt').then((m) => m.QuizAttemptPage),
         title: 'Quiz',
+      },
+
+      // Add Activity -> Ebook (design only for now - nothing is saved yet)
+      {
+        path: 'courses/:courseId/sections/:sectionId/ebook',
+        canActivate: [featureGuard([FEATURE.EBOOK, 'create'])],
+        loadComponent: () =>
+          import('./course-module/ebook/ebook-editor/ebook-editor').then((m) => m.EbookEditor),
+        title: 'Ebook',
       },
 
       {

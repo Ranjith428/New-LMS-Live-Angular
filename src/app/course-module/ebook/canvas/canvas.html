@@ -1,0 +1,78 @@
+<div class="pb-[28px] pl-[27px] pr-[46px] pt-[30px]" (click)="store.select(null)">
+  @for (s of store.sections(); track s.id; let i = $index; let last = $last) {
+    <section
+      class="group/section relative cursor-pointer transition-[outline-color]"
+      [class]="secCls(s)"
+      [style]="secStyle(s)"
+      (click)="onSection($event, s)"
+    >
+      @if (isSectionSel(s)) {
+        <div class="absolute -top-[26px] left-0 z-20 flex h-[22px] items-center gap-[2px] rounded-t-md bg-[#6ec4cb] px-2 text-[10px] text-white" (click)="$event.stopPropagation()">
+          <span class="mr-1 font-medium">{{ s.name }}</span>
+          <button type="button" class="tb" title="Move up" (click)="store.moveSection(s.id, -1)"><app-icon name="up" class="size-[10px]" /></button>
+          <button type="button" class="tb" title="Move down" (click)="store.moveSection(s.id, 1)"><app-icon name="down" class="size-[10px]" /></button>
+          <button type="button" class="tb" title="Duplicate" (click)="store.duplicateSection(s.id)"><app-icon name="copy" class="size-[10px]" /></button>
+          <button type="button" class="tb" title="Delete" (click)="store.deleteSection(s.id)"><app-icon name="trash" class="size-[10px]" /></button>
+        </div>
+      }
+
+      <div [style]="grid(s)">
+        @for (b of s.blocks; track b.id) {
+          @if (b.kind === 'text') {
+            <div class="relative" [style.justify-self]="b.type === 'button' ? null : 'stretch'" [style.display]="b.type === 'button' ? 'flex' : 'block'" [style.justify-content]="b.type === 'button' ? (b.align === 'center' ? 'center' : b.align === 'right' ? 'flex-end' : 'flex-start') : null">
+              <div
+                class="ebook-rich cursor-text break-words outline-offset-2 transition-[outline-color]"
+                [class]="blockCls(b)"
+                [class.line-clamp-2]="clamp(s, b)"
+                [style]="txt(b)"
+                [innerHTML]="b.html || placeholder(b)"
+                (click)="onBlock($event, s, b)"
+              ></div>
+              @if (isBlockSel(b)) { <ng-container [ngTemplateOutlet]="tools" /> }
+            </div>
+          } @else {
+            <div class="relative">
+              <div
+                class="outline-offset-2 transition-[outline-color]"
+                [class]="blockCls(b)"
+                [style]="img(b)"
+                (click)="onBlock($event, s, b)"
+              >
+                @if (asImage(b).src) {
+                  <img [src]="asImage(b).src" [alt]="asImage(b).alt" class="size-full" [style.object-fit]="asImage(b).fit" [style.border-radius]="'inherit'" />
+                } @else {
+                  <div class="flex size-full flex-col items-center justify-center gap-1 rounded-[inherit] bg-[#eaf3f4] px-3 text-center text-[11px] text-[#4fb3c8]">
+                    <app-icon name="image" class="size-[22px]" />
+                    {{ asImage(b).placeholder }}
+                  </div>
+                }
+              </div>
+              @if (isBlockSel(b)) { <ng-container [ngTemplateOutlet]="tools" /> }
+            </div>
+          }
+        }
+      </div>
+    </section>
+
+    <!-- divider = add-section handle -->
+    <div class="group/add relative my-[8px] flex h-[22px] items-center justify-center" [class]="last ? 'opacity-0 hover:opacity-100' : ''" (click)="$event.stopPropagation()">
+      <div class="h-[3px] w-[504px] rounded-full bg-[#dcdcdc] transition-colors group-hover/add:bg-[#6ec4cb]"></div>
+      <button type="button" class="absolute hidden h-[22px] items-center gap-1 rounded-full bg-[#6ec4cb] px-3 text-[11px] font-medium text-white shadow group-hover/add:flex" (click)="store.openAddSection(i + 1)">
+        <app-icon name="plus" class="size-[10px]" /> Add section
+      </button>
+    </div>
+  }
+
+  @if (store.sections().length === 0) {
+    <button type="button" class="mx-auto flex h-[60px] w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[#dcdcdc] text-[14px] text-[#555555] hover:border-[#6ec4cb] hover:text-[#4fb3c8]" (click)="store.openAddSection(0)">
+      <app-icon name="plus" class="size-[14px]" /> Add section
+    </button>
+  }
+</div>
+
+<ng-template #tools>
+  <div class="absolute -top-[22px] right-0 z-20 flex h-[20px] items-center rounded-t-md bg-[#6ec4cb] px-1 text-white" (click)="$event.stopPropagation()">
+    <button type="button" class="tb" title="Duplicate" (click)="store.duplicateBlock()"><app-icon name="copy" class="size-[10px]" /></button>
+    <button type="button" class="tb" title="Delete" (click)="store.deleteBlock()"><app-icon name="trash" class="size-[10px]" /></button>
+  </div>
+</ng-template>

@@ -1,0 +1,17 @@
+<div class="ebook-root h-[calc(100vh-84px)] overflow-y-auto bg-white px-4 pb-8 pt-3 font-['DM_Sans',sans-serif] text-[#555555] sm:px-6 xl:px-10">
+  <div class="mx-auto w-full max-w-[1100px]">
+    <button
+      type="button"
+      class="mb-4 text-[13px] text-[#555555] outline-none hover:text-[#4fb3c8] focus-visible:ring-2 focus-visible:ring-[#6ec4cb]"
+      (click)="back()"
+    >
+      ‹ Back
+    </button>
+
+    <main class="rounded-[20px] bg-[#fefefe] p-4 pb-2 shadow-[0_2px_24px_rgba(0,0,0,.05)]">
+      <app-editor-panel />
+      <app-canvas />
+    </main>
+  </div>
+</div>
+<app-add-section-modal />

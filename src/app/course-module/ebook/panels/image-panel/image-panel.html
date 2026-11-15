@@ -1,0 +1,80 @@
+@if (i(); as img) {
+  @if (store.page() === 0) {
+    <div class="grid grid-cols-2 items-start gap-[19px]">
+      <div class="flex flex-col gap-[14px]">
+        <app-card title="Image Source" [minHeight]="114">
+          <div class="flex items-center gap-3">
+            <div class="flex size-[46px] shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#f1f1f1] text-[#767676]">
+              @if (img.src) {
+                <img [src]="img.src" [alt]="img.alt" class="size-full object-cover" />
+              } @else {
+                <app-icon name="image" class="size-[18px]" />
+              }
+            </div>
+            <div class="flex flex-col gap-[6px]">
+              <label class="btn cursor-pointer">
+                <app-icon name="upload" class="size-[10px]" /> {{ img.src ? 'Replace image' : 'Upload image' }}
+                <input type="file" accept="image/*" class="hidden" (change)="pick($event)" />
+              </label>
+              @if (img.src) {
+                <button type="button" class="btn" (click)="store.updateImage({ src: '' })"><app-icon name="x" class="size-[10px]" /> Remove</button>
+              }
+            </div>
+          </div>
+        </app-card>
+        <app-card title="Alt Text">
+          <label class="flex h-[19px] items-center rounded-md bg-[#f1f1f1] px-2 text-[10px] focus-within:ring-1 focus-within:ring-[#6ec4cb]">
+            <input
+              type="text"
+              class="w-full bg-transparent text-[#555555] outline-none placeholder:text-[#767676]"
+              placeholder="Describe the image"
+              [value]="img.alt"
+              (input)="store.updateImage({ alt: $any($event.target).value })"
+            />
+          </label>
+        </app-card>
+      </div>
+
+      <div class="flex flex-col gap-[11px]">
+        <app-card title="Size" [minHeight]="117">
+          <app-row label="Width">
+            <app-number suffix="%" [min]="1" [max]="100" [value]="img.width" (changed)="store.updateImage({ width: $event ?? 100 })" />
+          </app-row>
+          <app-row label="Height">
+            <app-number suffix="px" placeholder="Auto" [min]="0" [value]="img.height || null" (changed)="store.updateImage({ height: $event ?? 0 })" />
+          </app-row>
+        </app-card>
+        <app-card title="Position">
+          <app-row label="Fit">
+            <app-select [value]="img.fit" [options]="fitOptions" (changed)="store.updateImage({ fit: $any($event) })" />
+          </app-row>
+          <app-row label="Align">
+            <app-select [value]="img.align" [options]="alignOptions" (changed)="store.updateImage({ align: $any($event) })" />
+          </app-row>
+        </app-card>
+      </div>
+    </div>
+  } @else {
+    <div class="grid grid-cols-2 items-start gap-[19px]">
+      <app-card title="Appearance">
+        <app-row label="Opacity">
+          <app-number suffix="%" [min]="0" [max]="100"[value]="img.opacity" (changed)="store.updateImage({ opacity: $event })" />
+        </app-row>
+        <app-row label="Corner Radius">
+          <app-number suffix="px" [min]="0" [value]="img.radius" (changed)="store.updateImage({ radius: $event })" />
+        </app-row>
+        <app-row label="Shadow">
+          <app-select [value]="img.shadow" [options]="shadowOptions" (changed)="store.updateImage({ shadow: $any($event) })" />
+        </app-row>
+      </app-card>
+      <app-card title="Border">
+        <app-row label="Width">
+          <app-number suffix="px" [min]="0" [value]="img.borderWidth" (changed)="store.updateImage({ borderWidth: $event })" />
+        </app-row>
+        <app-row label="Color" [width]="null">
+          <app-color [value]="img.borderColor" (changed)="store.updateImage({ borderColor: $event })" />
+        </app-row>
+      </app-card>
+    </div>
+  }
+}

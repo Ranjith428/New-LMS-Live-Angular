@@ -1,0 +1,79 @@
+@if (store.addModal()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" (click)="store.closeAddSection()">
+    <div
+      class="relative h-[370px] w-[637px] rounded-[14px] bg-white shadow-2xl"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Add section"
+      (click)="$event.stopPropagation()"
+    >
+      <h2 class="absolute left-[19px] top-[19px] text-[16px] font-medium leading-[22px] text-[#555555]">Add section</h2>
+
+      <button
+        type="button"
+        class="absolute right-0 top-0 flex h-[25px] w-[32px] items-center justify-center rounded-[7px] bg-[#f2554a] text-white transition hover:brightness-95"
+        aria-label="Close"
+        (click)="store.closeAddSection()"
+      >
+        <app-icon name="x" class="size-[14px]" />
+      </button>
+
+      <!-- categories -->
+      <nav class="absolute left-[19px] top-[50px] flex w-[139px] flex-col gap-[13px]">
+        @for (c of categories; track c.id) {
+          <button
+            type="button"
+            class="h-[30px] rounded-[12px] px-[15px] text-left text-[12px] text-[#555555] transition"
+            [class]="store.modalCategory() === c.id ? 'bg-[#e6e6e6] font-medium' : 'bg-[#f4f4f4] hover:bg-[#ececec]'"
+            (click)="store.modalCategory.set(c.id)"
+          >
+            {{ c.label }}
+          </button>
+        }
+      </nav>
+
+      <!-- templates -->
+      <div class="absolute bottom-[20px] left-[170px] right-[19px] top-[50px] rounded-[14px] bg-[#f4f4f4] p-[12px]">
+        <div class="ebook-scroll h-full overflow-y-auto rounded-[10px] bg-white px-[3px] pb-[14px] pt-[20px]">
+          <div class="grid grid-cols-2 items-start gap-x-[11px] gap-y-[15px]">
+            @for (t of current().templates; track t.id) {
+              <button
+                type="button"
+                class="group relative block w-full overflow-hidden rounded-[3px] text-left transition hover:ring-2 hover:ring-[#6ec4cb] focus-visible:ring-2 focus-visible:ring-[#6ec4cb]"
+                [style.height.px]="t.thumb.height"
+                [style.background]="t.thumb.bg"
+                [title]="t.label"
+                (click)="insert(t)"
+              >
+                @if (t.thumb.title) {
+                  @if (t.thumb.glass) {
+                    <div class="absolute inset-[7px] flex flex-col items-center justify-center rounded-[2px] bg-white/55">
+                      <span class="font-['Poppins'] text-[5px] text-[#555]">Ebook heading 4</span>
+                      <span class="font-['Poppins'] text-[11px] font-bold leading-[15px]" [style.color]="t.thumb.titleColor">{{ t.thumb.title }}</span>
+                      <app-icon name="chevron-down" class="size-[7px] text-[#555]" />
+                    </div>
+                  } @else {
+                    <span class="absolute left-[10px] top-1/2 -translate-y-1/2 font-['Poppins'] text-[11px] font-bold" [style.color]="t.thumb.titleColor">{{ t.thumb.title }}</span>
+                  }
+                } @else {
+                  <div class="grid h-full gap-[6px] bg-white p-[6px]" [style.grid-template-columns]="'repeat(' + (t.thumb.cols ?? 1) + ', minmax(0,1fr))'" [style.background]="t.thumb.bg">
+                    @for (cell of t.thumb.cells; track $index) {
+                      @switch (cell) {
+                        @case ('img') { <div class="flex items-center justify-center rounded-[3px] bg-[#dbeaec] text-[#4fb3c8]"><app-icon name="image" class="size-[12px]" /></div> }
+                        @case ('title') { <div class="h-[7px] w-3/5 self-center justify-self-center rounded bg-[#bdbdbd]"></div> }
+                        @case ('lines') { <div class="flex flex-col justify-center gap-[3px]"><i class="h-[3px] rounded bg-[#cfcfcf]"></i><i class="h-[3px] rounded bg-[#cfcfcf]"></i><i class="h-[3px] w-2/3 rounded bg-[#cfcfcf]"></i></div> }
+                        @case ('num') { <div class="flex flex-col items-center justify-center gap-[3px]"><i class="h-[9px] w-1/2 rounded bg-[#6ec4cb]"></i><i class="h-[3px] w-2/3 rounded bg-[#cfcfcf]"></i></div> }
+                        @case ('btn') { <div class="h-[9px] w-1/3 self-center justify-self-center rounded bg-[#6ec4cb]"></div> }
+                        @case ('avatar') { <div class="size-[18px] self-center justify-self-center rounded-full bg-[#dbeaec]"></div> }
+                      }
+                    }
+                  </div>
+                }
+              </button>
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+}
