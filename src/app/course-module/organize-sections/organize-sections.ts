@@ -25,6 +25,8 @@ import {
 } from '../../services/Section management.service';
 import { MultimediaUpload } from '../pop-modals/multimedia-upload/multimedia-upload';
 import { EbookImportService } from '../ebook/ebook-import';
+import { EbookSummary } from '../ebook/ebook-api.model';
+import { EbookManagementService } from '../../services/ebook-management.service';
 import { EbookStartModal } from '../ebook/ebook-start-modal';
 import { Section as EbookSection } from '../ebook/models';
 import { MultimediaManagementService } from '../../services/multimedia-management.service';
@@ -76,6 +78,7 @@ export class OrganizeSections implements OnInit, AfterViewInit, OnDestroy {
 
   private readonly multimediaService = inject(MultimediaManagementService);
   private readonly questionBankService = inject(QuestionBankService);
+  private readonly ebookService = inject(EbookManagementService);
   private readonly destroyRef = inject(DestroyRef);
 
   // ---------- permissions (Admin -> package, other roles -> Role Management; the server enforces the same) ----------
@@ -184,19 +187,28 @@ export class OrganizeSections implements OnInit, AfterViewInit, OnDestroy {
   // ---------- multimedia ----------
   /** Resources already fetched, keyed by section id. */
   private readonly resourcesBySection = signal<ReadonlyMap<number, MultimediaResource[]>>(new Map());
+  // ---------- ebooks ----------
+  /** Ebooks already fetched, keyed by section id (names only - the content is loaded by the editor / reader). */
+  private readonly ebooksBySection = signal<ReadonlyMap<number, EbookSummary[]>>(new Map());
   // ---------- question banks ----------
   /** Question banks already fetched, keyed by ORGANIZE section id. */
   private readonly banksBySection = signal<ReadonlyMap<number, ApiBankResponse[]>>(new Map());
   /** Blocks double clicks on Add Activity -> Question Bank while the bank is being created. */
   private readonly bankCreating = signal(false);
-  /** Multimedia rows first, then question banks - shaped for the activity rows in the template. */
+  /** Ebook rows first, then multimedia, then question banks - shaped for the activity rows in the template. */
   private readonly activitiesBySection = computed(() => {
+    const ebooks = this.ebooksBySection();
     const resources = this.resourcesBySection();
     const banks = this.banksBySection();
     const map = new Map<number, SectionActivity[]>();
-    const sectionIds = new Set<number>([...resources.keys(), ...banks.keys()]);
+    const sectionIds = new Set<number>([...ebooks.keys(), ...resources.keys(), ...banks.keys()]);
     for (const sectionId of sectionIds) {
       map.set(sectionId, [
+        ...(ebooks.get(sectionId) ?? []).map(e => ({
+          id: e.id,
+          kind: 'Ebook' as const,
+          title: e.name,
+        })),
         ...(resources.get(sectionId) ?? []).map(r => ({
           id: r.id,
           kind: 'Multimedia' as const,
@@ -712,7 +724,7 @@ export class OrganizeSections implements OnInit, AfterViewInit, OnDestroy {
     }
     // Add Activity -> Ebook asks "Start from scratch" or "Upload" first
     if (kind === 'Ebook') {
-      if (activity) this.goToEbook(sectionId);
+      if (activity) this.goToEbook(sectionId, activity.id); // the pencil / row of a saved ebook opens it for editing
       else this.ebookDialogSectionId.set(sectionId);
       return;
     }
@@ -783,6 +795,8 @@ export class OrganizeSections implements OnInit, AfterViewInit, OnDestroy {
       // a Question Bank row is deleted through the question-bank API, not the multimedia API
       if (target.activity.kind === 'Question Bank') {
         this.removeBank(target.sectionId, target.activity.id);
+      } else if (target.activity.kind === 'Ebook') {
+        this.removeEbook(target.sectionId, target.activity.id);
       } else {
         this.removeActivity(target.sectionId, target.activity.id);
       }
@@ -802,6 +816,25 @@ export class OrganizeSections implements OnInit, AfterViewInit, OnDestroy {
             ),
           );
           this.showToast('Resource deleted successfully.');
+        },
+        error: (err: unknown) => this.showToast(this.messageOf(err)),
+      });
+  }
+
+  /** Deletes an ebook (its name and all its pages). */
+  private removeEbook(sectionId: number, ebookId: number): void {
+    this.ebookService
+      .delete(this.course.id, sectionId, ebookId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.ebooksBySection.update(map =>
+            new Map(map).set(
+              sectionId,
+              (map.get(sectionId) ?? []).filter(e => e.id !== ebookId),
+            ),
+          );
+          this.showToast('Ebook deleted successfully.');
         },
         error: (err: unknown) => this.showToast(this.messageOf(err)),
       });
@@ -837,6 +870,15 @@ export class OrganizeSections implements OnInit, AfterViewInit, OnDestroy {
    */
   private loadResources(sectionId: number, silent = false): void {
     this.loadBanks(sectionId, silent);
+    this.ebookService
+      .list(this.course.id, sectionId)
+      .pipe(take(1), takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: list => this.ebooksBySection.update(map => new Map(map).set(sectionId, list)),
+        error: (err: unknown) => {
+          if (!silent) this.showToast(this.messageOf(err));
+        },
+      });
     this.multimediaService
       .getResources(this.course.id, sectionId)
       .pipe(take(1), takeUntilDestroyed(this.destroyRef))
@@ -896,8 +938,11 @@ export class OrganizeSections implements OnInit, AfterViewInit, OnDestroy {
       });
   }
 
-  private goToEbook(sectionId: number): void {
-    void this.router.navigate(['/admin-dashboard', 'courses', this.course.id, 'sections', sectionId, 'ebook']);
+  /** New ebook (no id) or an existing one to edit. */
+  private goToEbook(sectionId: number, ebookId?: number): void {
+    const commands: (string | number)[] = ['/admin-dashboard', 'courses', this.course.id, 'sections', sectionId, 'ebook'];
+    if (ebookId !== undefined) commands.push(ebookId);
+    void this.router.navigate(commands);
   }
 
   private goToBank(sectionId: number, bankId: number): void {

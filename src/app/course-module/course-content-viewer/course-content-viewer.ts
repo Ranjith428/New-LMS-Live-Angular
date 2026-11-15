@@ -21,6 +21,7 @@ import { catchError } from 'rxjs/operators';
 
 import { Section, SectionManagementService } from '../../services/Section management.service';
 import { MultimediaManagementService } from '../../services/multimedia-management.service';
+import { EbookManagementService } from '../../services/ebook-management.service';
 import { CourseProgress, SectionProgressService } from '../../services/section-progress.service';
 import { QuestionBankService } from '../../services/question-bank.service';
 import { QuizAttemptService } from '../../services/quiz-attempt.service';
@@ -30,9 +31,12 @@ import { environment } from '../../../environments/environment'; // adjust the p
 import { ApiBankResponse } from '../question-bank.model';
 import { MultimediaResource, extensionOf, trustedMediaUrl } from '../multimedia.model';
 import { QuizAttemptPage } from '../quiz-attempt/quiz-attempt'; // adjust the path to your project
+import { EbookSummary } from '../ebook/ebook-api.model';
+import { Section as EbookPage } from '../ebook/models';
+import { EbookReader } from '../ebook/ebook-reader/ebook-reader';
 
 type ViewMode = 'desktop' | 'tablet' | 'mobile';
-type TabKind = 'Multimedia' | 'Question Bank';
+type TabKind = 'Ebook' | 'Multimedia' | 'Question Bank';
 type MediaKind = 'image' | 'video' | 'audio' | 'pdf' | 'docx' | 'office' | 'other';
 
 interface ContentTab {
@@ -43,6 +47,7 @@ interface ContentTab {
   addedAt: number;
   resource?: MultimediaResource;
   bankId?: number;
+  ebookId?: number;
 }
 
 interface ActiveMedia {
@@ -61,7 +66,7 @@ const OFFICE_EXTENSIONS: ReadonlySet<string> = new Set(['docx', 'pptx', 'xlsx'])
 
 @Component({
   selector: 'app-course-content-viewer',
-  imports: [QuizAttemptPage],
+  imports: [QuizAttemptPage, EbookReader],
   host: { class: 'block' },
   templateUrl: './course-content-viewer.html',
   styleUrl: './course-content-viewer.css',
@@ -76,6 +81,7 @@ export class CourseContentViewer implements OnInit, AfterViewInit {
   private readonly sectionService = inject(SectionManagementService);
   private readonly progressService = inject(SectionProgressService);
   private readonly multimediaService = inject(MultimediaManagementService);
+  private readonly ebookService = inject(EbookManagementService);
   private readonly questionBankService = inject(QuestionBankService);
   private readonly quizService = inject(QuizAttemptService);
   private readonly courseService = inject(CourseManagementService);
@@ -408,6 +414,9 @@ export class CourseContentViewer implements OnInit, AfterViewInit {
     }
     this.loading.set(true);
     forkJoin({
+      ebooks: this.ebookService
+        .list(this.courseId, sectionId)
+        .pipe(catchError(() => of([] as EbookSummary[]))),
       resources: this.multimediaService
         .getResources(this.courseId, sectionId)
         .pipe(catchError(() => of([] as MultimediaResource[]))),
@@ -417,8 +426,15 @@ export class CourseContentViewer implements OnInit, AfterViewInit {
       ).pipe(catchError(() => of([] as ApiBankResponse[]))),
     })
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(({ resources, banks }) => {
+      .subscribe(({ ebooks, resources, banks }) => {
         const items: ContentTab[] = [
+          ...ebooks.map(e => ({
+            key: `eb-${e.id}`,
+            label: e.name,
+            kind: 'Ebook' as const,
+            addedAt: this.timeOf(e.createdAt),
+            ebookId: e.id,
+          })),
           ...resources.map(r => ({
             key: `mm-${r.id}`,
             label: r.name,
@@ -434,7 +450,7 @@ export class CourseContentViewer implements OnInit, AfterViewInit {
             bankId: b.id,
           })),
         ];
-        // Same order as the Organize screen: multimedia rows first (oldest first), then question banks.
+        // Same order as the Organize screen: ebooks first, then multimedia rows (oldest first), then question banks.
         this.tabs.set(items);
         this.activeTabKey.set(items[0]?.key ?? '');
         this.loading.set(false);
@@ -499,8 +515,9 @@ export class CourseContentViewer implements OnInit, AfterViewInit {
 
   // ---------- learner progress & quiz lock ----------
   //
-  // Rule: every content item of a section (multimedia files, e-books later) must be COMPLETED before the quiz
+  // Rule: every content item of a section (ebooks and multimedia files) must be COMPLETED before the quiz
   // of that section opens. An item is completed only when the learner really went through it:
+  //   ebook ................. scrolled down to the end of the ebook
   //   video / audio ......... played to the end (skipping ahead does not count)
   //   Word (.docx) .......... scrolled down to the end
   //   image ................. shown
@@ -510,14 +527,18 @@ export class CourseContentViewer implements OnInit, AfterViewInit {
 
   private static readonly SAVE_INTERVAL_MS = 3000;
 
-  /** Best percent seen in this visit per multimedia item id (shows instantly, before the server has answered). */
-  private readonly localPercent = signal<ReadonlyMap<number, number>>(new Map());
-  private readonly pendingPercent = new Map<number, { sectionId: number; percent: number }>();
-  private readonly saveTimers = new Map<number, ReturnType<typeof setTimeout>>();
-  private readonly lastSaveAt = new Map<number, number>();
-  /** video / audio: seconds really played per item id, and the last playback position seen. */
+  /** Best percent seen in this visit per item ("EBOOK:3", "MULTIMEDIA:12"): shows at once, before the server has answered. */
+  private readonly localPercent = signal<ReadonlyMap<string, number>>(new Map());
+  private readonly pendingPercent = new Map<string, { sectionId: number; type: 'EBOOK' | 'MULTIMEDIA'; id: number; percent: number }>();
+  private readonly saveTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private readonly lastSaveAt = new Map<string, number>();
+  /** video / audio: seconds really played per multimedia id, and the last playback position seen. */
   private readonly watchedSeconds = new Map<number, number>();
   private readonly lastPosition = new Map<number, number>();
+
+  private static itemKey(type: 'EBOOK' | 'MULTIMEDIA', id: number): string {
+    return `${type}:${id}`;
+  }
 
   /** Loads the learner's progress (rings, completed items). Admins / instructors get tracked = false. */
   loadProgress(): void {
@@ -535,16 +556,20 @@ export class CourseContentViewer implements OnInit, AfterViewInit {
   }
 
   /** What the server has stored for one item. */
-  private serverPercent(type: 'MULTIMEDIA' | 'QUIZ', itemId: number): number {
+  private serverPercent(type: 'EBOOK' | 'MULTIMEDIA' | 'QUIZ', itemId: number): number {
     return this.progress()?.items.find(i => i.itemType === type && i.itemId === itemId)?.percent ?? 0;
   }
 
-  /** 0-100 of a tab: its multimedia file, or the quiz (100 only after it was submitted). */
+  /** Server value or what was reached in this visit, whichever is higher. */
+  private percentOf(type: 'EBOOK' | 'MULTIMEDIA', id: number): number {
+    return Math.max(this.serverPercent(type, id), this.localPercent().get(CourseContentViewer.itemKey(type, id)) ?? 0);
+  }
+
+  /** 0-100 of a tab: its ebook / multimedia file, or the quiz (100 only after it was submitted). */
   tabPercent(tab: ContentTab): number {
     if (tab.kind === 'Question Bank') return tab.bankId ? this.serverPercent('QUIZ', tab.bankId) : 0;
-    const id = tab.resource?.id;
-    if (!id) return 0;
-    return Math.max(this.serverPercent('MULTIMEDIA', id), this.localPercent().get(id) ?? 0);
+    if (tab.kind === 'Ebook') return tab.ebookId ? this.percentOf('EBOOK', tab.ebookId) : 0;
+    return tab.resource?.id ? this.percentOf('MULTIMEDIA', tab.resource.id) : 0;
   }
 
   isDone(tab: ContentTab | null | undefined): boolean {
@@ -553,7 +578,7 @@ export class CourseContentViewer implements OnInit, AfterViewInit {
 
   /** Content tabs (not quizzes) of the current section that the learner has not completed yet. */
   readonly remainingTabs = computed(() =>
-    this.canTrackProgress() ? this.tabs().filter(t => t.kind === 'Multimedia' && this.tabPercent(t) < 100) : [],
+    this.canTrackProgress() ? this.tabs().filter(t => t.kind !== 'Question Bank' && this.tabPercent(t) < 100) : [],
   );
 
   /** The quiz stays locked until every content tab of the section is completed (learners only). */
@@ -568,13 +593,13 @@ export class CourseContentViewer implements OnInit, AfterViewInit {
   /** "I've finished reading" button. */
   markItemDone(): void {
     const id = this.activeTab()?.resource?.id;
-    if (id) this.setPercent(id, 100);
+    if (id) this.setPercent('MULTIMEDIA', id, 100);
   }
 
   /** Image: shown = completed. */
   onImageLoaded(): void {
     const id = this.activeTab()?.resource?.id;
-    if (id) this.setPercent(id, 100);
+    if (id) this.setPercent('MULTIMEDIA', id, 100);
   }
 
   /** Video / audio, on every timeupdate: only natural playback counts as watched. */
@@ -584,7 +609,7 @@ export class CourseContentViewer implements OnInit, AfterViewInit {
     if (!id || !this.canTrackProgress() || !el.duration || !Number.isFinite(el.duration)) return;
     const duration = el.duration;
     // first time in this visit: continue from what the server already knows
-    let watched = this.watchedSeconds.get(id) ?? (this.tabPercentById(id) / 100) * duration;
+    let watched = this.watchedSeconds.get(id) ?? (this.percentOf('MULTIMEDIA', id) / 100) * duration;
     const delta = el.currentTime - (this.lastPosition.get(id) ?? el.currentTime);
     this.lastPosition.set(id, el.currentTime);
     // normal playback moves forward a little each tick; a jump (seeking ahead) is ignored
@@ -592,7 +617,7 @@ export class CourseContentViewer implements OnInit, AfterViewInit {
       watched = Math.max(watched, el.currentTime);
     }
     this.watchedSeconds.set(id, watched);
-    this.setPercent(id, watched >= duration - 1.5 ? 100 : Math.min(99, (watched / duration) * 100));
+    this.setPercent('MULTIMEDIA', id, watched >= duration - 1.5 ? 100 : Math.min(99, (watched / duration) * 100));
   }
 
   /** Video / audio reached its end: completed only if it was really played (not skipped to the end). */
@@ -600,7 +625,7 @@ export class CourseContentViewer implements OnInit, AfterViewInit {
     const id = this.activeTab()?.resource?.id;
     const el = event.target as HTMLMediaElement;
     if (!id || !this.canTrackProgress() || !el.duration || !Number.isFinite(el.duration)) return;
-    if ((this.watchedSeconds.get(id) ?? 0) >= el.duration - 3) this.setPercent(id, 100);
+    if ((this.watchedSeconds.get(id) ?? 0) >= el.duration - 3) this.setPercent('MULTIMEDIA', id, 100);
   }
 
   /** Word document: completed when the learner has scrolled to the end. */
@@ -611,58 +636,146 @@ export class CourseContentViewer implements OnInit, AfterViewInit {
   private updateDocxProgress(el: HTMLElement): void {
     const id = this.activeTab()?.resource?.id;
     if (!id || !this.canTrackProgress() || this.docxLoading() || !el.scrollHeight) return;
-    const fitsOnScreen = el.scrollHeight - el.clientHeight <= 4; // short document: all of it is visible
-    const atEnd = el.scrollHeight - el.clientHeight - el.scrollTop <= 8;
-    this.setPercent(id, fitsOnScreen || atEnd ? 100 : Math.min(99, ((el.scrollTop + el.clientHeight) / el.scrollHeight) * 100));
+    this.setScrollProgress('MULTIMEDIA', id, el, true);
   }
 
-  private tabPercentById(resourceId: number): number {
-    return Math.max(this.serverPercent('MULTIMEDIA', resourceId), this.localPercent().get(resourceId) ?? 0);
+  // ---------- ebook (Add Activity -> Ebook) ----------
+
+  /** The ebook pages of the active ebook tab (parsed from the saved content). */
+  readonly activeEbookPages = signal<EbookPage[] | null>(null);
+  readonly ebookLoading = signal(false);
+  readonly ebookError = signal('');
+  private readonly ebookCache = new Map<number, EbookPage[]>();
+  private readonly ebookHost = viewChild<ElementRef<HTMLDivElement>>('ebookHost');
+
+  /** Opens the ebook of the active tab (cached once loaded). */
+  private readonly loadActiveEbook = effect(() => {
+    const tab = this.activeTab();
+    if (tab?.kind !== 'Ebook' || !tab.ebookId) {
+      return;
+    }
+    const ebookId = tab.ebookId;
+    untracked(() => this.fetchEbook(ebookId));
+  });
+
+  fetchEbook(ebookId: number): void {
+    const sectionId = this.selectedSectionId();
+    if (!this.courseId || sectionId === null) return;
+    const cached = this.ebookCache.get(ebookId);
+    if (cached) {
+      this.activeEbookPages.set(cached);
+      this.ebookError.set('');
+      this.scheduleEbookCheck();
+      return;
+    }
+    this.activeEbookPages.set(null);
+    this.ebookError.set('');
+    this.ebookLoading.set(true);
+    this.ebookService
+      .get(this.courseId, sectionId, ebookId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: ebook => {
+          try {
+            const pages = JSON.parse(ebook.content) as EbookPage[];
+            if (!Array.isArray(pages)) throw new Error('not an array');
+            this.ebookCache.set(ebookId, pages);
+            // the user may have switched tab while it loaded
+            if (this.activeTab()?.ebookId === ebookId) this.activeEbookPages.set(pages);
+            this.ebookLoading.set(false);
+            this.scheduleEbookCheck();
+          } catch {
+            this.ebookLoading.set(false);
+            this.ebookError.set('This ebook could not be opened.');
+          }
+        },
+        error: () => {
+          this.ebookLoading.set(false);
+          this.ebookError.set('The ebook could not be loaded.');
+        },
+      });
+  }
+
+  /** An ebook that fits the screen without scrolling counts as read; the images need a moment to get their height. */
+  private scheduleEbookCheck(): void {
+    for (const delay of [400, 1500, 4000]) {
+      setTimeout(() => {
+        const el = this.ebookHost()?.nativeElement;
+        if (el) this.updateEbookProgress(el);
+      }, delay);
+    }
+  }
+
+  /** Ebook: completed when the learner has scrolled to the end. */
+  onEbookScroll(event: Event): void {
+    this.updateEbookProgress(event.target as HTMLElement);
+  }
+
+  private updateEbookProgress(el: HTMLElement): void {
+    const id = this.activeTab()?.ebookId;
+    if (!id || !this.canTrackProgress() || !el.scrollHeight) return;
+    // a short ebook (no scrolling) only counts as read once its images are in place
+    const imagesReady = Array.from(el.querySelectorAll('img')).every(img => img.complete);
+    this.setScrollProgress('EBOOK', id, el, imagesReady);
+  }
+
+  /** Scrolled to the end = 100 %; before that the scrolled share, at most 99 %. */
+  private setScrollProgress(type: 'EBOOK' | 'MULTIMEDIA', id: number, el: HTMLElement, allowFitsOnScreen: boolean): void {
+    const fitsOnScreen = el.scrollHeight - el.clientHeight <= 4; // short content: all of it is visible
+    const atEnd = el.scrollHeight - el.clientHeight - el.scrollTop <= 8;
+    if ((fitsOnScreen && allowFitsOnScreen) || (!fitsOnScreen && atEnd)) {
+      this.setPercent(type, id, 100);
+    } else {
+      this.setPercent(type, id, Math.min(99, ((el.scrollTop + el.clientHeight) / el.scrollHeight) * 100));
+    }
   }
 
   /** Raises one item's percent. It shows at once; it is sent to the server at most every few seconds (at once at 100). */
-  private setPercent(resourceId: number, percent: number): void {
+  private setPercent(type: 'EBOOK' | 'MULTIMEDIA', id: number, percent: number): void {
     const sectionId = this.selectedSectionId();
     if (!this.courseId || sectionId === null || !this.canTrackProgress()) return;
     const value = Math.max(0, Math.min(100, Math.floor(percent)));
-    if (value <= this.tabPercentById(resourceId)) return; // only ever goes up
-    this.localPercent.update(m => new Map(m).set(resourceId, value));
-    this.pendingPercent.set(resourceId, { sectionId, percent: value });
-    const wait = CourseContentViewer.SAVE_INTERVAL_MS - (Date.now() - (this.lastSaveAt.get(resourceId) ?? 0));
+    if (value <= this.percentOf(type, id)) return; // only ever goes up
+    const key = CourseContentViewer.itemKey(type, id);
+    this.localPercent.update(m => new Map(m).set(key, value));
+    this.pendingPercent.set(key, { sectionId, type, id, percent: value });
+    const wait = CourseContentViewer.SAVE_INTERVAL_MS - (Date.now() - (this.lastSaveAt.get(key) ?? 0));
     if (value >= 100 || wait <= 0) {
-      this.flushItem(resourceId);
-    } else if (!this.saveTimers.has(resourceId)) {
-      this.saveTimers.set(resourceId, setTimeout(() => this.flushItem(resourceId), wait));
+      this.flushItem(key);
+    } else if (!this.saveTimers.has(key)) {
+      this.saveTimers.set(key, setTimeout(() => this.flushItem(key), wait));
     }
   }
 
-  private flushItem(resourceId: number): void {
-    const timer = this.saveTimers.get(resourceId);
+  private flushItem(key: string): void {
+    const timer = this.saveTimers.get(key);
     if (timer) {
       clearTimeout(timer);
-      this.saveTimers.delete(resourceId);
+      this.saveTimers.delete(key);
     }
-    const job = this.pendingPercent.get(resourceId);
+    const job = this.pendingPercent.get(key);
     if (!job) return;
-    this.pendingPercent.delete(resourceId);
-    this.lastSaveAt.set(resourceId, Date.now());
-    this.progressService.updateItem(this.courseId, job.sectionId, resourceId, job.percent).subscribe({
-      next: p => this.progress.set(p),
-      error: () => {
-        // not saved: take the local mark back so the quiz does not look unlocked when the server would refuse it
-        this.localPercent.update(m => {
-          const next = new Map(m);
-          next.delete(resourceId);
-          return next;
-        });
-        this.lastSaveAt.delete(resourceId);
-      },
-    });
+    this.pendingPercent.delete(key);
+    this.lastSaveAt.set(key, Date.now());
+    this.progressService
+      .updateItem(this.courseId, job.sectionId, job.id, job.percent, job.type === 'EBOOK' ? 'ebook' : 'multimedia')
+      .subscribe({
+        next: p => this.progress.set(p),
+        error: () => {
+          // not saved: take the local mark back so the quiz does not look unlocked when the server would refuse it
+          this.localPercent.update(m => {
+            const next = new Map(m);
+            next.delete(key);
+            return next;
+          });
+          this.lastSaveAt.delete(key);
+        },
+      });
   }
 
   /** Sends everything still waiting (section change, page close). */
   private flushAllProgress(): void {
-    [...this.pendingPercent.keys()].forEach(id => this.flushItem(id));
+    [...this.pendingPercent.keys()].forEach(key => this.flushItem(key));
   }
 
   /** The embedded quiz was submitted: the section / course progress changed. */

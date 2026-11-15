@@ -14,11 +14,58 @@
         <span aria-hidden="true">‹</span> Back
       </button>
     </div>
+
+    <!-- Ebook name + Save -->
+    <div class="flex min-w-0 flex-1 flex-wrap items-start justify-end gap-3">
+      <div class="min-w-[220px] max-w-[360px] flex-1">
+        <label class="sr-only" for="ebook-name">Ebook name</label>
+        <input
+          id="ebook-name"
+          type="text"
+          class="h-[34px] w-full rounded-full border-0 bg-white px-4 text-[12px] text-[#4b4b4b] shadow-sm outline-none placeholder:text-neutral-500 focus-visible:ring-2 focus-visible:ring-[#6ec4cb] disabled:opacity-60"
+          placeholder="Ebook name"
+          autocomplete="off"
+          [attr.maxlength]="nameMax"
+          [value]="name()"
+          [disabled]="loading()"
+          [attr.aria-invalid]="nameError() ? 'true' : null"
+          [attr.aria-describedby]="nameError() ? 'ebook-name-error' : null"
+          (input)="onName($event)"
+          (keydown.enter)="save()"
+        />
+        @if (nameError()) {
+          <p id="ebook-name-error" class="mt-1 pl-4 text-[10px] text-red-600" role="alert">{{ nameError() }}</p>
+        }
+      </div>
+      <button
+        type="button"
+        class="h-[34px] min-w-[96px] rounded-full bg-[#6ec4cb] px-6 text-[12px] font-medium text-white outline-none transition-colors hover:bg-[#4fb3c8] focus-visible:ring-2 focus-visible:ring-[#6ec4cb] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+        [disabled]="saving() || loading()"
+        (click)="save()"
+      >{{ saving() ? 'Saving…' : 'Save' }}</button>
+    </div>
   </header>
 
+  @if (notice(); as n) {
+    <p
+      class="mb-2 shrink-0 rounded-xl px-4 py-2 text-center text-[11px]"
+      [class]="n.type === 'ok' ? 'bg-[#e3f3f6] text-[#2b4f57]' : 'bg-red-50 text-red-700'"
+      [attr.role]="n.type === 'ok' ? 'status' : 'alert'"
+    >{{ n.text }}</p>
+  }
+
   <main class="ebook-scroll relative mb-5 min-h-0 w-full flex-1 overflow-y-auto rounded-2xl bg-white p-5 shadow-sm sm:p-6">
-    <app-editor-panel />
-    <app-canvas />
+    @if (loading()) {
+      <p class="py-16 text-center text-[12px] text-neutral-500" role="status">Loading ebook…</p>
+    } @else if (loadError()) {
+      <div class="mx-auto max-w-md py-16 text-center" role="alert">
+        <p class="text-[12px] text-red-700">{{ loadError() }}</p>
+        <button type="button" class="mt-4 h-8 rounded-full bg-[#f3f3f3] px-5 text-[11px] text-[#4b4b4b] outline-none hover:bg-[#e9e9e9] focus-visible:ring-2 focus-visible:ring-[#6ec4cb]" (click)="back()">Back</button>
+      </div>
+    } @else {
+      <app-editor-panel />
+      <app-canvas />
+    }
   </main>
 </div>
 <app-add-section-modal />

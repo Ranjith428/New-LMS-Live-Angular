@@ -312,6 +312,38 @@
               </div>
             }
           }
+          @case ('Ebook') {
+            <h1 class="mb-2 text-[26px] font-medium leading-tight text-[#4b4b4b]">{{ activeTab()?.label }}</h1>
+            @if (ebookError()) {
+              <div class="rounded-lg bg-red-50 p-3 text-center text-xs text-red-700" role="alert">
+                {{ ebookError() }}
+                <button type="button" class="ml-2 font-semibold underline" (click)="fetchEbook(activeTab()?.ebookId ?? 0)">Retry</button>
+              </div>
+            } @else if (ebookLoading() || !activeEbookPages()) {
+              <div class="space-y-3" role="status" aria-label="Loading ebook">
+                @for (item of [1, 2, 3]; track item) {
+                <div class="h-24 animate-pulse rounded-lg bg-[#f3f3f3]"></div>
+                }
+              </div>
+            } @else {
+              <!-- The ebook scrolls inside this box: reaching the end completes it (learners) -->
+              <div
+                #ebookHost
+                class="h-[68vh] w-full overflow-auto rounded-xl bg-white shadow-sm"
+                tabindex="0"
+                role="region"
+                [attr.aria-label]="'Ebook: ' + activeTab()?.label"
+                (scroll)="onEbookScroll($event)"
+              >
+                <app-ebook-reader [sections]="activeEbookPages()!" />
+              </div>
+              @if (canTrackProgress()) {
+                <p class="mt-2 text-[10px] text-neutral-500" role="status">
+                  @if (isDone(activeTab())) { Completed } @else { Scroll down to the end of the ebook to complete it. }
+                </p>
+              }
+            }
+          }
           @case ('Question Bank') {
             @if (learnerView() && quizLocked()) {
               <!-- The quiz opens only after every content item of this section is completed -->

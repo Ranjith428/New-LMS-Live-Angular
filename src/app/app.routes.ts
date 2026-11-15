@@ -189,7 +189,15 @@ export const routes: Routes = [
         title: 'Quiz',
       },
 
-      // Add Activity -> Ebook (design only for now - nothing is saved yet)
+      // Edit a saved ebook (the pencil / row of an Ebook activity in Organize Modules)
+      {
+        path: 'courses/:courseId/sections/:sectionId/ebook/:ebookId',
+        canActivate: [featureGuard([FEATURE.EBOOK, 'update'])],
+        loadComponent: () =>
+          import('./course-module/ebook/ebook-editor/ebook-editor').then((m) => m.EbookEditor),
+        title: 'Ebook',
+      },
+      // Add Activity -> Ebook (a new ebook)
       {
         path: 'courses/:courseId/sections/:sectionId/ebook',
         canActivate: [featureGuard([FEATURE.EBOOK, 'create'])],

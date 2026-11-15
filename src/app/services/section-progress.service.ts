@@ -21,7 +21,7 @@ export interface SectionProgressItem {
 /** One content item of a section: a multimedia file or the quiz. */
 export interface ContentItemProgress {
   sectionId: number;
-  itemType: 'MULTIMEDIA' | 'QUIZ';
+  itemType: 'EBOOK' | 'MULTIMEDIA' | 'QUIZ';
   /** Multimedia id, or the question bank id for QUIZ. */
   itemId: number;
   name: string;
@@ -51,11 +51,17 @@ export class SectionProgressService {
       .pipe(map((res) => res.data));
   }
 
-  /** The learner has got `percent` % through one multimedia item (100 = completed). The server only ever raises it. */
-  updateItem(courseId: number, sectionId: number, itemId: number, percent: number): Observable<CourseProgress> {
+  /** The learner has got `percent` % through one content item (100 = completed). The server only ever raises it. */
+  updateItem(
+    courseId: number,
+    sectionId: number,
+    itemId: number,
+    percent: number,
+    type: 'multimedia' | 'ebook' = 'multimedia',
+  ): Observable<CourseProgress> {
     return this.http
       .post<ApiResponse<CourseProgress>>(
-        `${this.baseUrl}/${courseId}/sections/${sectionId}/items/multimedia/${itemId}/progress`,
+        `${this.baseUrl}/${courseId}/sections/${sectionId}/items/${type}/${itemId}/progress`,
         { percent },
       )
       .pipe(map((res) => res.data));

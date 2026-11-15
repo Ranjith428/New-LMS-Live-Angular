@@ -1,0 +1,35 @@
+/* rich text of an ebook page (same rules as the editor, so the reader looks exactly like the design) */
+.ebook-reader .ebook-rich b,
+.ebook-reader .ebook-rich strong {
+  font-weight: 700;
+}
+.ebook-reader .ebook-rich mark {
+  background: #fff3a0;
+  color: inherit;
+}
+.ebook-reader .ebook-rich code {
+  font-family: ui-monospace, 'Source Code Pro', monospace;
+  background: #efefef;
+  padding: 0 3px;
+  border-radius: 3px;
+}
+.ebook-reader .ebook-rich a {
+  color: #4fb3c8;
+  text-decoration: underline;
+}
+.ebook-reader .ebook-rich ul {
+  list-style: disc;
+  padding-left: 1.2em;
+}
+.ebook-reader .ebook-rich ol {
+  list-style: decimal;
+  padding-left: 1.2em;
+}
+.ebook-reader .ebook-rich table {
+  border-collapse: collapse;
+}
+.ebook-reader .ebook-rich td,
+.ebook-reader .ebook-rich th {
+  border: 1px solid #d6d6d6;
+  padding: 2px 6px;
+}

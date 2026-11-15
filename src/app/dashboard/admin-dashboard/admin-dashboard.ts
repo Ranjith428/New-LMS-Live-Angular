@@ -207,16 +207,16 @@ export class AdminDashboard {
       ];
     }
 
-    // Ebook editor (/courses/:courseId/sections/:sectionId/ebook)
-    // Flow: Content Management > Course List > Organize Modules > E-Book > Blank E-Book
-    const ebookMatch = /^\/admin-dashboard\/courses\/(\d+)\/sections\/\d+\/ebook\/?$/.exec(path);
+    // Ebook editor (/courses/:courseId/sections/:sectionId/ebook, or .../ebook/:ebookId to edit a saved one)
+    // Flow: Content Management > Course List > Organize Modules > E-Book > Blank E-Book (new) / Edit E-Book (saved)
+    const ebookMatch = /^\/admin-dashboard\/courses\/(\d+)\/sections\/\d+\/ebook(\/\d+)?\/?$/.exec(path);
     if (ebookMatch) {
       return [
         { label: 'Content Management', link: null, plain: true },
         { label: 'Course List', link: courseList, plain: true },
         { label: 'Organize Modules', link: courseList, queryParams: { organize: ebookMatch[1] }, plain: true },
         { label: 'E-Book', link: null, plain: true },
-        { label: 'Blank E-Book', link: null, plain: true },
+        { label: ebookMatch[2] ? 'Edit E-Book' : 'Blank E-Book', link: null, plain: true },
       ];
     }
 

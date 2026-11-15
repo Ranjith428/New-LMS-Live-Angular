@@ -258,12 +258,7 @@ export class QuestionBankComponent implements OnInit {
   toggleExpand(id: string): void {
     this.menuOpenId.set(null);
     this.pillDropdown.set(null);
-    this.expandedIds.update(set => {
-      const next = new Set(set);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+        this.expandedIds.update(set => (set.has(id) ? new Set<string>() : new Set([id])));
   }
 
   // ───── NEW: Question Bank name (header) ─────
@@ -735,8 +730,8 @@ export class QuestionBankComponent implements OnInit {
 
     if (issue.questionClientId) {
       const id = issue.questionClientId;
-      this.expandedIds.update(set => new Set(set).add(id)); // open the question with the problem
-      if (/score|feedback/i.test(issue.message)) this.scoringOpenId.set(id);
+      this.expandedIds.set(new Set([id])); // open only the question with the problem
+      // if (/score|feedback/i.test(issue.message)) this.scoringOpenId.set(id);
       setTimeout(() => document.getElementById(`q-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
     }
   }

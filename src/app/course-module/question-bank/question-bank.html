@@ -255,7 +255,7 @@
 
                   <!-- Body: only when expanded -->
                   @if (isExpanded(question.clientId)) {
-                    <ng-container *ngTemplateOutlet="questionBody; context: { $implicit: question }" />
+                    <ng-container *ngTemplateOutlet="questionBody; context: { $implicit: question, compact: false }" />
                   }
                 </article>
             } @empty {
@@ -266,7 +266,7 @@
           </section>
 
           <!-- RIGHT: Add Question only. Fixed to the available height: the page does not scroll on desktop;
-               only the form area inside scrolls if the screen is too short, and "+ Add Question" stays pinned. -->
+               the form area does NOT scroll either (compact sizes), and "+ Add Question" stays pinned. -->
           <section class="flex min-h-[515px] flex-col rounded-2xl bg-[#f6f6f6] px-4 py-4 lg:h-full lg:min-h-0">
             <div class="relative z-20 mb-3 flex shrink-0 flex-wrap items-center justify-between gap-2">
               <h2 class="text-sm font-semibold">Add Question</h2>
@@ -334,13 +334,13 @@
               </div>
             </div>
 
-            <!-- Form area: takes the remaining height (scrolls only if the screen is too short) -->
-            <div class="min-h-0 flex-1 lg:overflow-y-auto lg:pr-1">
-              <ng-container *ngTemplateOutlet="questionBody; context: { $implicit: draft() }" />
+            <!-- Form area: sized to its content (no extra empty gap). Scrolls ONLY when content overflows (e.g. many options) -->
+            <div class="min-h-0 lg:overflow-y-auto">
+              <ng-container *ngTemplateOutlet="questionBody; context: { $implicit: draft(), compact: true }" />
             </div>
 
-            <!-- "+ Add Question" stays pinned at the bottom of the panel -->
-            <div class="mt-3 flex shrink-0 justify-center">
+            <!-- "+ Add Question" sits directly under the form -->
+            <div class="mt-4 flex shrink-0 justify-center">
               <button type="button" (click)="addQuestion()" [disabled]="busy()"
                 class="h-8 rounded-full bg-white px-6 text-xs hover:bg-[#e9f6f8] disabled:opacity-50">+ Add Question</button>
             </div>
@@ -424,93 +424,103 @@
   }
 </div>
 
-<!-- Shared by the list (left) and the Add Question form (right): text, answers, scoring, feedback. -->
-<ng-template #questionBody let-question>
-        @if (question.hidden) {
-          <p class="rounded-2xl bg-white p-4 text-sm italic text-gray-400">
-            Hidden question: {{ question.text ? (question.text.length > 80 ? question.text.slice(0, 80) + '…' : question.text) : 'Untitled' }}
-          </p>
-        } @else {
-          <div class="mb-3 rounded-2xl bg-white focus-within:ring-1 focus-within:ring-[#64bbcb]">
-            <textarea [(ngModel)]="question.text" (ngModelChange)="markDirty(question)"
-              [maxlength]="limits.questionChars" rows="1" placeholder="Enter your question" aria-label="Question"
-              class="block min-h-[51px] w-full resize-y rounded-t-2xl border-0 bg-transparent px-5 pb-1 pt-3.5 text-sm outline-none"></textarea>
-            <p class="px-5 pb-2 text-right text-[11px] text-[#8a8a8a]">Maximum character {{ (question.text || '').length }}/{{ limits.questionChars }}</p>
-          </div>
+<!-- Shared by the list (left) and the Add Question form (right): text, answers, scoring, feedback.
+     compact=true on the right panel = smaller sizes, no scroll. compact=false (left list) = original sizes. -->
+<ng-template #questionBody let-question let-compact="compact">
+  @let c = !!compact;
+  @if (question.hidden) {
+    <p class="rounded-2xl bg-white p-4 text-sm italic text-gray-400">
+      Hidden question: {{ question.text ? (question.text.length > 80 ? question.text.slice(0, 80) + '…' : question.text) : 'Untitled' }}
+    </p>
+  } @else {
+    <div class="rounded-2xl bg-white focus-within:ring-1 focus-within:ring-[#64bbcb]" [class]="c ? 'mb-2' : 'mb-3'">
+      <textarea [(ngModel)]="question.text" (ngModelChange)="markDirty(question)"
+        [maxlength]="limits.questionChars" rows="1" placeholder="Enter your question" aria-label="Question"
+        class="block w-full rounded-t-2xl border-0 bg-transparent outline-none"
+        [class]="c ? 'min-h-[36px] resize-none px-4 pb-0.5 pt-2 text-xs' : 'min-h-[51px] resize-y px-5 pb-1 pt-3.5 text-sm'"></textarea>
+      <p class="text-right text-[#8a8a8a]" [class]="c ? 'px-4 pb-1 text-[10px]' : 'px-5 pb-2 text-[11px]'">Maximum character {{ (question.text || '').length }}/{{ limits.questionChars }}</p>
+    </div>
 
-          @if (question.type === 'short') {
-            <p class="mb-1.5 text-sm">Answer</p>
-            <textarea [(ngModel)]="question.expectedAnswer" (ngModelChange)="markDirty(question)"
-              [maxlength]="limits.answerChars" rows="3" placeholder="Enter expected short answer" aria-label="Expected answer"
-              class="block w-full resize-y rounded-2xl bg-white px-5 py-3.5 text-sm outline-none focus:ring-1 focus:ring-[#64bbcb]"></textarea>
-          } @else {
-            <p class="mb-1.5 text-sm">Answers</p>
-            <div>
-              @for (option of question.options; track option.clientId; let oi = $index; let last = $last) {
-                <div class="group/opt mb-[13px] flex min-h-[51px] items-center gap-5 rounded-2xl bg-white pl-[22px] pr-5 last:mb-0">
-                  @if (question.type === 'single') {
-                    <input type="radio" [name]="'answer-' + question.clientId" [checked]="option.correct"
-                      (change)="setCorrect(question, oi)" aria-label="Correct answer"
-                      class="size-3 shrink-0 cursor-pointer appearance-none rounded-full border-white bg-[#ececec] checked:border-[3px] checked:bg-[#64bbcb] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#64bbcb]">
-                  } @else {
-                    <input type="checkbox" [checked]="option.correct"
-                      (change)="setCorrect(question, oi)" aria-label="Correct answer"
-                      class="size-3 shrink-0 cursor-pointer appearance-none rounded-[3px] border-white bg-[#ececec] checked:border-[3px] checked:bg-[#64bbcb] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#64bbcb]">
-                  }
-                  <input [(ngModel)]="option.text" (ngModelChange)="markDirty(question)" [maxlength]="limits.optionChars"
-                    [placeholder]="'Option ' + (oi + 1)" [attr.aria-label]="'Option ' + (oi + 1)"
-                    class="min-w-0 flex-1 bg-transparent py-3 text-sm outline-none placeholder:text-[#505050]">
-                  <span class="shrink-0 text-[11px] text-[#8a8a8a]" [attr.title]="'Maximum ' + limits.optionChars + ' characters'">{{ (option.text || '').length }}/{{ limits.optionChars }}</span>
-                  @if (question.scoringType === 'advanced') {
-                    <input type="number" min="0" max="100" step="1" [ngModel]="option.points"
-                      (ngModelChange)="setOptionPoints(question, oi, $event)" (keydown)="blockNonDigit($event)" (input)="limitScore($event)" placeholder="Points" aria-label="Option points"
-                      class="w-20 rounded-lg bg-[#f6f6f6] p-2 text-xs outline-none">
-                  }
-                  <span class="flex items-center gap-2 opacity-0 transition-opacity focus-within:opacity-100 group-hover/opt:opacity-100 [@media(hover:none)]:opacity-100">
-                    <button type="button" (click)="duplicateOption(question, oi)" aria-label="Duplicate option" class="text-xs hover:text-[#64bbcb]">⧉</button>
-                    <button type="button" (click)="deleteOption(question, oi)" aria-label="Delete option" class="text-xs hover:text-red-500">✕</button>
-                  </span>
-                  @if (last && question.options.length < limits.maxOptions) {
-                    <button type="button" (click)="addOption(question)" aria-label="Add option"
-                      class="shrink-0 text-sm text-[#7a7a7a] hover:text-[#64bbcb]">+ Add</button>
-                  }
-                </div>
-              }
-            </div>
-          }
-
-          <!-- scoring fields: always shown, driven by the Scoring dropdown in the action pill -->
-          <div class="mt-4">
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              @if (question.scoringType === 'basic') {
-                <label class="text-xs">Correct score
-                  <input type="number" min="0" max="100" step="1" [ngModel]="question.correctScore"
-                    (ngModelChange)="setScore(question, 'correctScore', $event)" (keydown)="blockNonDigit($event)" (input)="limitScore($event)" placeholder="Enter Score"
-                    class="mt-1.5 block h-9 w-full rounded-lg bg-white px-3 text-xs outline-none placeholder:text-[#b5b5b5]">
-                </label>
-                <label class="text-xs">Incorrect score
-                  <input type="number" min="0" max="100" step="1" [ngModel]="question.incorrectScore"
-                    (ngModelChange)="setScore(question, 'incorrectScore', $event)" (keydown)="blockNonDigit($event)" (input)="limitScore($event)" placeholder="Enter Score"
-                    class="mt-1.5 block h-9 w-full rounded-lg bg-white px-3 text-xs outline-none placeholder:text-[#b5b5b5]">
-                </label>
-              } @else {
-                <p class="text-xs text-[#7a7a7a] sm:col-span-2">Advanced scoring: enter the points for each answer option above.</p>
-              }
-            </div>
-            <div class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
-              <label class="text-xs">Correct feedback
-                <textarea [(ngModel)]="question.correctFeedback" (ngModelChange)="markDirty(question)"
-                  [maxlength]="limits.feedbackChars" rows="2" placeholder="Enter the Text"
-                  class="mt-1.5 block w-full resize-y rounded-lg bg-white px-3 py-2.5 text-xs outline-none placeholder:text-[#b5b5b5] focus:ring-1 focus:ring-[#64bbcb]"></textarea>
-                <span class="mt-1 block text-right text-[11px] text-[#8a8a8a]">Maximum character {{ (question.correctFeedback || '').length }}/{{ limits.feedbackChars }}</span>
-              </label>
-              <label class="text-xs">Incorrect feedback
-                <textarea [(ngModel)]="question.incorrectFeedback" (ngModelChange)="markDirty(question)"
-                  [maxlength]="limits.feedbackChars" rows="2" placeholder="Enter the Text"
-                  class="mt-1.5 block w-full resize-y rounded-lg bg-white px-3 py-2.5 text-xs outline-none placeholder:text-[#b5b5b5] focus:ring-1 focus:ring-[#64bbcb]"></textarea>
-                <span class="mt-1 block text-right text-[11px] text-[#8a8a8a]">Maximum character {{ (question.incorrectFeedback || '').length }}/{{ limits.feedbackChars }}</span>
-              </label>
-            </div>
+    @if (question.type === 'short') {
+      <p [class]="c ? 'mb-1 text-xs' : 'mb-1.5 text-sm'">Answer</p>
+      <textarea [(ngModel)]="question.expectedAnswer" (ngModelChange)="markDirty(question)"
+        [maxlength]="limits.answerChars" [rows]="c ? 2 : 3" placeholder="Enter expected short answer" aria-label="Expected answer"
+        class="block w-full rounded-2xl bg-white outline-none focus:ring-1 focus:ring-[#64bbcb]"
+        [class]="c ? 'resize-none px-4 py-2 text-xs' : 'resize-y px-5 py-3.5 text-sm'"></textarea>
+    } @else {
+      <p [class]="c ? 'mb-1 text-xs' : 'mb-1.5 text-sm'">Answers</p>
+      <div>
+        @for (option of question.options; track option.clientId; let oi = $index; let last = $last) {
+          <div class="group/opt flex items-center rounded-2xl bg-white last:mb-0"
+            [class]="c ? 'mb-1.5 min-h-[34px] gap-3 pl-4 pr-3' : 'mb-[13px] min-h-[51px] gap-5 pl-[22px] pr-5'">
+            @if (question.type === 'single') {
+              <input type="radio" [name]="'answer-' + question.clientId" [checked]="option.correct"
+                (change)="setCorrect(question, oi)" aria-label="Correct answer"
+                class="size-3 shrink-0 cursor-pointer appearance-none rounded-full border-white bg-[#ececec] checked:border-[3px] checked:bg-[#64bbcb] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#64bbcb]">
+            } @else {
+              <input type="checkbox" [checked]="option.correct"
+                (change)="setCorrect(question, oi)" aria-label="Correct answer"
+                class="size-3 shrink-0 cursor-pointer appearance-none rounded-[3px] border-white bg-[#ececec] checked:border-[3px] checked:bg-[#64bbcb] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#64bbcb]">
+            }
+            <input [(ngModel)]="option.text" (ngModelChange)="markDirty(question)" [maxlength]="limits.optionChars"
+              [placeholder]="'Option ' + (oi + 1)" [attr.aria-label]="'Option ' + (oi + 1)"
+              class="min-w-0 flex-1 bg-transparent outline-none placeholder:text-[#505050]"
+              [class]="c ? 'py-1.5 text-xs' : 'py-3 text-sm'">
+            <span class="shrink-0 text-[#8a8a8a]" [class]="c ? 'text-[10px]' : 'text-[11px]'" [attr.title]="'Maximum ' + limits.optionChars + ' characters'">{{ (option.text || '').length }}/{{ limits.optionChars }}</span>
+            @if (question.scoringType === 'advanced') {
+              <input type="number" min="0" max="100" step="1" [ngModel]="option.points"
+                (ngModelChange)="setOptionPoints(question, oi, $event)" (keydown)="blockNonDigit($event)" (input)="limitScore($event)" placeholder="Points" aria-label="Option points"
+                class="rounded-lg bg-[#f6f6f6] text-xs outline-none" [class]="c ? 'w-16 p-1' : 'w-20 p-2'">
+            }
+            <span class="flex items-center gap-2 opacity-0 transition-opacity focus-within:opacity-100 group-hover/opt:opacity-100 [@media(hover:none)]:opacity-100">
+              <button type="button" (click)="duplicateOption(question, oi)" aria-label="Duplicate option" class="text-xs hover:text-[#64bbcb]">⧉</button>
+              <button type="button" (click)="deleteOption(question, oi)" aria-label="Delete option" class="text-xs hover:text-red-500">✕</button>
+            </span>
+            @if (last && question.options.length < limits.maxOptions) {
+              <button type="button" (click)="addOption(question)" aria-label="Add option"
+                class="shrink-0 text-[#7a7a7a] hover:text-[#64bbcb]" [class]="c ? 'text-xs' : 'text-sm'">+ Add</button>
+            }
           </div>
         }
+      </div>
+    }
+
+    <!-- scoring fields: always shown, driven by the Scoring dropdown in the action pill -->
+    <div [class]="c ? 'mt-2' : 'mt-4'">
+      <div class="grid grid-cols-1 sm:grid-cols-2" [class]="c ? 'gap-2' : 'gap-3'">
+        @if (question.scoringType === 'basic') {
+          <label class="text-xs">Correct score
+            <input type="number" min="0" max="100" step="1" [ngModel]="question.correctScore"
+              (ngModelChange)="setScore(question, 'correctScore', $event)" (keydown)="blockNonDigit($event)" (input)="limitScore($event)" placeholder="Enter Score"
+              class="block w-full rounded-lg bg-white px-3 text-xs outline-none placeholder:text-[#b5b5b5]"
+              [class]="c ? 'mt-1 h-8' : 'mt-1.5 h-9'">
+          </label>
+          <label class="text-xs">Incorrect score
+            <input type="number" min="0" max="100" step="1" [ngModel]="question.incorrectScore"
+              (ngModelChange)="setScore(question, 'incorrectScore', $event)" (keydown)="blockNonDigit($event)" (input)="limitScore($event)" placeholder="Enter Score"
+              class="block w-full rounded-lg bg-white px-3 text-xs outline-none placeholder:text-[#b5b5b5]"
+              [class]="c ? 'mt-1 h-8' : 'mt-1.5 h-9'">
+          </label>
+        } @else {
+          <p class="text-xs text-[#7a7a7a] sm:col-span-2">Advanced scoring: enter the points for each answer option above.</p>
+        }
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2" [class]="c ? 'mt-2 gap-2' : 'mt-3 gap-3'">
+        <label class="text-xs">Correct feedback
+          <textarea [(ngModel)]="question.correctFeedback" (ngModelChange)="markDirty(question)"
+            [maxlength]="limits.feedbackChars" rows="2" placeholder="Enter the Text"
+            class="block w-full rounded-lg bg-white px-3 text-xs outline-none placeholder:text-[#b5b5b5] focus:ring-1 focus:ring-[#64bbcb]"
+            [class]="c ? 'mt-1 resize-none py-1.5' : 'mt-1.5 resize-y py-2.5'"></textarea>
+          <span class="mt-1 block text-right text-[#8a8a8a]" [class]="c ? 'text-[10px]' : 'text-[11px]'">Maximum character {{ (question.correctFeedback || '').length }}/{{ limits.feedbackChars }}</span>
+        </label>
+        <label class="text-xs">Incorrect feedback
+          <textarea [(ngModel)]="question.incorrectFeedback" (ngModelChange)="markDirty(question)"
+            [maxlength]="limits.feedbackChars" rows="2" placeholder="Enter the Text"
+            class="block w-full rounded-lg bg-white px-3 text-xs outline-none placeholder:text-[#b5b5b5] focus:ring-1 focus:ring-[#64bbcb]"
+            [class]="c ? 'mt-1 resize-none py-1.5' : 'mt-1.5 resize-y py-2.5'"></textarea>
+          <span class="mt-1 block text-right text-[#8a8a8a]" [class]="c ? 'text-[10px]' : 'text-[11px]'">Maximum character {{ (question.incorrectFeedback || '').length }}/{{ limits.feedbackChars }}</span>
+        </label>
+      </div>
+    </div>
+  }
 </ng-template>
