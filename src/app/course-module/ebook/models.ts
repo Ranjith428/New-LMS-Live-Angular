@@ -9,7 +9,7 @@ export interface RGBA {
 export type TextType = 'h1' | 'h2' | 'h3' | 'p' | 'caption' | 'button';
 export type Align = 'left' | 'center' | 'right' | 'justify';
 export type ShadowPreset = 'none' | 'left' | 'right' | 'bottom' | 'round';
-export type SelectionKind = 'text' | 'image' | 'section';
+export type SelectionKind = 'text' | 'image' | 'video' | 'section';
 
 export interface TextShadow {
   preset: ShadowPreset;
@@ -53,7 +53,22 @@ export interface ImageBlock {
   shadow: ImageShadow;
 }
 
-export type Block = TextBlock | ImageBlock;
+export interface VideoBlock {
+  id: string;
+  kind: 'video';
+  /** YouTube / Vimeo / Loom / Dailymotion link, a pasted <iframe> embed code, or a direct .mp4 / .webm link */
+  url: string;
+  /** accessible title of the player */
+  title: string;
+  /** % of column width */
+  width: number;
+  /** px – 0 means automatic (16:9) */
+  height: number;
+  align: 'left' | 'center' | 'right';
+  radius: number | null;
+}
+
+export type Block = TextBlock | ImageBlock | VideoBlock;
 
 export interface Section {
   id: string;
@@ -163,6 +178,20 @@ export function image(over: Partial<ImageBlock> = {}): ImageBlock {
     borderWidth: null,
     borderColor: rgba(220, 220, 220),
     shadow: 'none',
+    ...over,
+  };
+}
+
+export function video(over: Partial<VideoBlock> = {}): VideoBlock {
+  return {
+    id: uid('v'),
+    kind: 'video',
+    url: '',
+    title: '',
+    width: 100,
+    height: 0,
+    align: 'center',
+    radius: null,
     ...over,
   };
 }

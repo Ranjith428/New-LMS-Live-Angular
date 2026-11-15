@@ -1,8 +1,8 @@
 @if (i(); as img) {
   @if (store.page() === 0) {
-    <div class="grid grid-cols-2 items-start gap-[19px]">
-      <div class="flex flex-col gap-[14px]">
-        <app-card title="Image Source" [minHeight]="114">
+    <div class="grid grid-flow-col grid-cols-2 grid-rows-2 gap-x-[12px] gap-y-[8px]">
+      <div class="contents">
+        <app-card title="Image Source">
           <div class="flex items-center gap-3">
             <div class="flex size-[46px] shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#f1f1f1] text-[#767676]">
               @if (img.src) {
@@ -35,8 +35,8 @@
         </app-card>
       </div>
 
-      <div class="flex flex-col gap-[11px]">
-        <app-card title="Size" [minHeight]="117">
+      <div class="contents">
+        <app-card title="Size">
           <app-row label="Width">
             <app-number suffix="%" [min]="1" [max]="100" [value]="img.width" (changed)="store.updateImage({ width: $event ?? 100 })" />
           </app-row>
@@ -55,7 +55,7 @@
       </div>
     </div>
   } @else {
-    <div class="grid grid-cols-2 items-start gap-[19px]">
+    <div class="grid grid-cols-2 items-stretch gap-[12px]">
       <app-card title="Appearance">
         <app-row label="Opacity">
           <app-number suffix="%" [min]="0" [max]="100"[value]="img.opacity" (changed)="store.updateImage({ opacity: $event })" />

@@ -3,7 +3,7 @@ import { ChangeDetectionStrategy, Component, computed, input } from '@angular/co
 export type IconName =
   | 'chevron-down' | 'align-left' | 'align-center' | 'align-right' | 'align-justify'
   | 'table' | 'eyedropper' | 'link' | 'pencil' | 'code' | 'list' | 'clear' | 'font-color'
-  | 'plus' | 'x' | 'trash' | 'copy' | 'up' | 'down' | 'image' | 'upload'
+  | 'plus' | 'x' | 'trash' | 'copy' | 'up' | 'down' | 'image' | 'video' | 'upload'
   | 'tri-left' | 'tri-right';
 
 @Component({
@@ -41,6 +41,7 @@ export type IconName =
         @case ('up') { <path d="m5 12 7-7 7 7M12 19V5" /> }
         @case ('down') { <path d="M12 5v14M19 12l-7 7-7-7" /> }
         @case ('image') { <rect width="18" height="18" x="3" y="3" rx="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-3.09-3.09a2 2 0 0 0-2.82 0L6 21" /> }
+        @case ('video') { <rect width="18" height="14" x="3" y="5" rx="2" /><path d="m10 9 5 3-5 3z" /> }
         @case ('upload') { <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" /> }
         @case ('tri-left') { <path d="M16 5 7 12l9 7z" /> }
         @case ('tri-right') { <path d="M8 5l9 7-9 7z" /> }

@@ -422,10 +422,16 @@
   </div>
   }
 
-  <!-- Multimedia upload / edit dialog (Ebook pop-up is still a next-phase TODO) -->
+  <!-- Multimedia upload / edit dialog -->
   @if (resourceDialog(); as dialog) {
   <app-multimedia-upload [courseId]="course.id" [sectionId]="dialog.sectionId" [resource]="dialog.resource"
     (resourceSaved)="onResourceSaved($event)" (closed)="closeResourceDialog()" />
+  }
+
+  <!-- Ebook pop-up: Start from scratch / Upload document -->
+  @if (ebookDialogSectionId() !== null) {
+  <app-ebook-start-modal (closed)="closeEbookDialog()" (startScratch)="startEbookFromScratch()"
+    (imported)="onEbookImported($event)" />
   }
 
   @if (sectionDialogOpen()) {

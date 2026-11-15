@@ -24,6 +24,9 @@ import {
   SectionManagementService,
 } from '../../services/Section management.service';
 import { MultimediaUpload } from '../pop-modals/multimedia-upload/multimedia-upload';
+import { EbookImportService } from '../ebook/ebook-import';
+import { EbookStartModal } from '../ebook/ebook-start-modal';
+import { Section as EbookSection } from '../ebook/models';
 import { MultimediaManagementService } from '../../services/multimedia-management.service';
 import { MultimediaResource, MultimediaSaveResult } from '../multimedia.model';
 import { QuestionBankService, toUiError } from '../../services/question-bank.service';
@@ -55,7 +58,7 @@ export interface SectionActivity {
   selector: 'app-organize-sections',
   // CHANGED: block host so the fitted height (see updateFit) applies to the root element
   host: { class: 'block' },
-  imports: [MultimediaUpload],
+  imports: [MultimediaUpload, EbookStartModal],
   templateUrl: './organize-sections.html',
   styleUrl: './organize-sections.css',
 })
@@ -212,6 +215,9 @@ export class OrganizeSections implements OnInit, AfterViewInit, OnDestroy {
   readonly resourceDialog = signal<{ sectionId: number; resource: MultimediaResource | null } | null>(
     null,
   );
+  /** Add Activity -> Ebook pop-up (Start from scratch / Upload): the section it was opened for, null = closed. */
+  readonly ebookDialogSectionId = signal<number | null>(null);
+  private readonly ebookImport = inject(EbookImportService);
 
   private pendingRetry: (() => void) | null = null;
   private toastTimer: ReturnType<typeof setTimeout> | undefined;
@@ -704,9 +710,10 @@ export class OrganizeSections implements OnInit, AfterViewInit, OnDestroy {
       if (activity) this.openQuestionBankList(sectionId, activity);
       return;
     }
-    // Add Activity -> Ebook opens the ebook editor page
+    // Add Activity -> Ebook asks "Start from scratch" or "Upload" first
     if (kind === 'Ebook') {
-      this.goToEbook(sectionId);
+      if (activity) this.goToEbook(sectionId);
+      else this.ebookDialogSectionId.set(sectionId);
       return;
     }
     if (kind !== 'Multimedia') {
@@ -721,6 +728,26 @@ export class OrganizeSections implements OnInit, AfterViewInit, OnDestroy {
 
   closeResourceDialog(): void {
     this.resourceDialog.set(null);
+  }
+
+  closeEbookDialog(): void {
+    this.ebookDialogSectionId.set(null);
+  }
+
+  /** "Start from scratch": the editor opens with a blank page. */
+  startEbookFromScratch(): void {
+    const sectionId = this.ebookDialogSectionId();
+    this.ebookDialogSectionId.set(null);
+    if (sectionId !== null) this.goToEbook(sectionId);
+  }
+
+  /** "Upload": the document was converted to sections, so the editor opens with them (all editable). */
+  onEbookImported(sections: EbookSection[]): void {
+    const sectionId = this.ebookDialogSectionId();
+    this.ebookDialogSectionId.set(null);
+    if (sectionId === null) return;
+    this.ebookImport.set(sections);
+    this.goToEbook(sectionId);
   }
 
   /** <app-multimedia-upload> finished a successful upload / edit. */

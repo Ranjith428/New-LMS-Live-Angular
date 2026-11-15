@@ -1,7 +1,8 @@
 /* Ebook editor – styles that must reach innerHTML / contenteditable content,
    so the page component uses ViewEncapsulation.None and everything is scoped under .ebook-root. */
 
-.ebook-root [contenteditable][data-placeholder]:empty::before {
+.ebook-root [contenteditable][data-placeholder]:empty::before,
+.ebook-root [contenteditable][data-placeholder]:has(> br:only-child)::before {
   content: attr(data-placeholder);
   color: #555555;
   pointer-events: none;

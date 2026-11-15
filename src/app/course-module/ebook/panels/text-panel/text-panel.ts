@@ -39,18 +39,18 @@ export class TextPanel {
   );
 
   private readonly editor = viewChild<ElementRef<HTMLDivElement>>('editor');
-  private readonly blockId = computed(() => this.t()?.id);
   private range: Range | null = null;
 
   constructor() {
-    // Load the selected block's html into the editor only when the selection (or the editor) changes,
-    // so typing never resets the caret.
+    // Load the selected block's html into the editor when the selection changes, and whenever the text
+    // is edited somewhere else (directly on the page). The editor is only rewritten when its content
+    // really differs, so typing here never resets the caret.
     effect(() => {
       const el = this.editor()?.nativeElement;
-      const id = this.blockId();
-      if (!el || !id) return;
+      const html = this.t()?.html;
+      if (!el || html === undefined) return;
       untracked(() => {
-        el.innerHTML = this.t()?.html ?? '';
+        if (el.innerHTML !== html && !(html === '' && el.innerHTML === '<br>')) el.innerHTML = html;
       });
     });
   }

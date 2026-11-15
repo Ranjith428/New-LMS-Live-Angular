@@ -1,4 +1,4 @@
-import { Section, image, rgba, section, text } from './models';
+import { Section, image, rgba, section, text, video } from './models';
 
 export interface Thumb {
   bg: string;
@@ -208,7 +208,7 @@ const EXTERNAL: SectionTemplate[] = [
         'External content',
         [
           text('h3', 'External content'),
-          image({ height: 220, placeholder: 'Paste a video or embed URL in the image source' }),
+          video(),
         ],
         { gap: 10, padY: 12 },
       ),
@@ -276,26 +276,3 @@ export const CATEGORIES: TemplateCategory[] = [
   { id: 'team', label: 'Team & Authors', templates: TEAM },
   { id: 'own', label: 'Own Layout', templates: OWN },
 ];
-
-const LONG =
-  'Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry\'s standard dummy text ever since 1966, when designers at Letraset and James Mosley, the librarian at St Bride Printing Library in London, took a 1914 Cicero translation and scrambled it to make dummy text for Letraset\'s Body Type sheets. It has survived not';
-const LONG_FULL =
-  LONG +
-  ' only many decades, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised thanks to these sheets and more recently with desktop publishing software like Aldus PageMaker and Microsoft Word including versions of Lorem Ipsum.';
-
-/** The page that is open when the editor first loads (matches the Figma frame). */
-export function initialSections(): Section[] {
-  return [
-    section('Intro', [text('h1', ''), text('p', LONG, { })], { gap: 8 }),
-    section(
-      'Paragraphs',
-      [
-        text('h2', 'Paragraph'),
-        text('p', LONG_FULL),
-        text('p', LONG_FULL),
-        text('p', LONG_FULL),
-      ],
-      { gap: 10 },
-    ),
-  ];
-}

@@ -1,4 +1,5 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
+import { EbookImportService } from './ebook-import';
 import {
   Block,
   ImageBlock,
@@ -6,11 +7,12 @@ import {
   Selection,
   ShadowPreset,
   TextBlock,
+  VideoBlock,
   image,
   text,
   uid,
+  video,
 } from './models';
-import { initialSections } from './templates';
 
 const SHADOW_PRESETS: Record<ShadowPreset, { x: number | null; y: number | null; blur: number | null }> = {
   none: { x: null, y: null, blur: null },
@@ -20,10 +22,14 @@ const SHADOW_PRESETS: Record<ShadowPreset, { x: number | null; y: number | null;
   round: { x: 0, y: 0, blur: 4 },
 };
 
-/** Provided by <app-ebook-editor>, so every visit starts with a fresh page. */
+/**
+ * Provided by <app-ebook-editor>, so every visit starts fresh:
+ * - "Start from scratch" -> no sections at all (blank canvas with the "Add section" button)
+ * - "Upload"             -> the sections parsed from the uploaded document, all editable
+ */
 @Injectable()
 export class EbookStore {
-  readonly sections = signal<Section[]>(initialSections());
+  readonly sections = signal<Section[]>(inject(EbookImportService).take() ?? []);
   readonly selection = signal<Selection | null>(null);
   /** page of the property panel (the ◀ ▶ buttons) */
   readonly page = signal(0);
@@ -53,13 +59,16 @@ export class EbookStore {
     return b?.kind === 'image' ? b : null;
   });
 
-  constructor() {
-    // The Figma frame opens with the first heading selected.
-    const first = this.sections()[0];
-    this.selection.set({ kind: 'text', sectionId: first.id, blockId: first.blocks[0].id });
-  }
+  readonly selectedVideo = computed(() => {
+    const b = this.selectedBlock();
+    return b?.kind === 'video' ? b : null;
+  });
 
-  readonly pageCount = computed(() => (this.selection() ? 2 : 1));
+  /** a video has a single page of properties, everything else has two */
+  readonly pageCount = computed(() => {
+    const sel = this.selection();
+    return sel && sel.kind !== 'video' ? 2 : 1;
+  });
 
   /* ----------------------------- selection ----------------------------- */
   select(sel: Selection | null) {
@@ -94,12 +103,29 @@ export class EbookStore {
     }));
   }
 
+  /** Text typed directly on the page (not through the property panel). */
+  setTextHtml(sectionId: string, blockId: string, html: string) {
+    this.mapSection(sectionId, (s) => ({
+      ...s,
+      blocks: s.blocks.map((b) => (b.id === blockId && b.kind === 'text' ? { ...b, html } : b)),
+    }));
+  }
+
   updateImage(patch: Partial<ImageBlock>) {
     const sel = this.selection();
     if (sel?.kind !== 'image' || !sel.blockId) return;
     this.mapSection(sel.sectionId, (s) => ({
       ...s,
       blocks: s.blocks.map((b) => (b.id === sel.blockId && b.kind === 'image' ? { ...b, ...patch } : b)),
+    }));
+  }
+
+  updateVideo(patch: Partial<VideoBlock>) {
+    const sel = this.selection();
+    if (sel?.kind !== 'video' || !sel.blockId) return;
+    this.mapSection(sel.sectionId, (s) => ({
+      ...s,
+      blocks: s.blocks.map((b) => (b.id === sel.blockId && b.kind === 'video' ? { ...b, ...patch } : b)),
     }));
   }
 
@@ -120,16 +146,16 @@ export class EbookStore {
   }
 
   /* ----------------------------- structure ----------------------------- */
-  addBlock(kind: 'text' | 'image') {
+  addBlock(kind: 'text' | 'image' | 'video') {
     const sel = this.selection();
     if (!sel) return;
-    const block = kind === 'text' ? text('p', '') : image();
+    const block = kind === 'text' ? text('p', '') : kind === 'image' ? image() : video();
     this.mapSection(sel.sectionId, (s) => ({ ...s, blocks: [...s.blocks, block] }));
     this.select({ kind, sectionId: sel.sectionId, blockId: block.id });
   }
 
   private cloneBlock<T extends Block>(b: T): T {
-    return { ...structuredClone(b), id: uid(b.kind === 'text' ? 't' : 'i') };
+    return { ...structuredClone(b), id: uid(b.kind === 'text' ? 't' : b.kind === 'image' ? 'i' : 'v') };
   }
 
   duplicateBlock() {

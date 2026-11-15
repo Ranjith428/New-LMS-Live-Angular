@@ -1,4 +1,4 @@
-import { ImageBlock, ImageShadow, RGBA, Section, TEXT_STYLES, TextBlock } from './models';
+import { ImageBlock, ImageShadow, RGBA, Section, TEXT_STYLES, TextBlock, VideoBlock } from './models';
 
 export const css = (c: RGBA | null | undefined): string =>
   c ? `rgba(${c.r}, ${c.g}, ${c.b}, ${(c.a ?? 100) / 100})` : 'transparent';
@@ -75,6 +75,17 @@ export function sectionStyle(s: Section): Record<string, string> {
     'border-radius': `${s.radius ?? 0}px`,
     'box-shadow': SHADOWS[s.shadow],
     border: s.borderWidth ? `${s.borderWidth}px solid ${css(s.borderColor)}` : 'none',
+  };
+}
+
+export function videoStyle(b: VideoBlock): Record<string, string> {
+  return {
+    width: `${b.width}%`,
+    'margin-left': b.align === 'left' ? '0' : 'auto',
+    'margin-right': b.align === 'right' ? '0' : 'auto',
+    'border-radius': `${b.radius ?? 0}px`,
+    overflow: 'hidden',
+    ...(b.height ? { height: `${b.height}px` } : { 'aspect-ratio': '16 / 9' }),
   };
 }
 

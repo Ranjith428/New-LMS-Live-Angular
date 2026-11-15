@@ -2,13 +2,15 @@ import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { Block, Section, TEXT_STYLES } from '../models';
 import { EbookStore } from '../store';
-import { gridStyle, imageStyle, sectionStyle, textStyle } from '../style-utils';
+import { gridStyle, imageStyle, sectionStyle, textStyle, videoStyle } from '../style-utils';
+import { EditableHtml } from '../ui/editable-html';
 import { Icon } from '../ui/icon';
+import { VideoEmbedView } from '../ui/video-embed-view';
 
 @Component({
   selector: 'app-canvas',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon, NgTemplateOutlet],
+  imports: [Icon, NgTemplateOutlet, EditableHtml, VideoEmbedView],
   host: { '(document:keydown)': 'onKey($event)' },
   templateUrl: './canvas.html',
   styleUrl: './canvas.css',
@@ -19,6 +21,7 @@ export class Canvas {
   protected readonly secStyle = sectionStyle;
   protected readonly grid = gridStyle;
   protected readonly txt = textStyle;
+  protected readonly vid = videoStyle;
   protected readonly img = (b: Block) => imageStyle(b as never);
   protected asImage = (b: Block) => b as Extract<Block, { kind: 'image' }>;
 
@@ -54,6 +57,11 @@ export class Canvas {
   protected onBlock(e: Event, s: Section, b: Block) {
     e.stopPropagation();
     this.store.select({ kind: b.kind, sectionId: s.id, blockId: b.id });
+  }
+
+  /** Text typed directly on the page. */
+  protected onText(s: Section, b: Block, html: string) {
+    this.store.setTextHtml(s.id, b.id, html);
   }
 
   protected onKey(e: KeyboardEvent) {

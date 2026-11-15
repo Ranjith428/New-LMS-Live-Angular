@@ -25,12 +25,15 @@
                 [class]="blockCls(b)"
                 [class.line-clamp-2]="clamp(s, b)"
                 [style]="txt(b)"
-                [innerHTML]="b.html || placeholder(b)"
+                [attr.data-placeholder]="placeholder(b)"
+                [appEditableHtml]="b.html"
+                (edited)="onText(s, b, $event)"
+                (focus)="onBlock($event, s, b)"
                 (click)="onBlock($event, s, b)"
               ></div>
               @if (isBlockSel(b)) { <ng-container [ngTemplateOutlet]="tools" /> }
             </div>
-          } @else {
+          } @else if (b.kind === 'image') {
             <div class="relative">
               <div
                 class="outline-offset-2 transition-[outline-color]"
@@ -46,6 +49,18 @@
                     {{ asImage(b).placeholder }}
                   </div>
                 }
+              </div>
+              @if (isBlockSel(b)) { <ng-container [ngTemplateOutlet]="tools" /> }
+            </div>
+          } @else {
+            <div class="relative">
+              <div
+                class="outline-offset-2 transition-[outline-color]"
+                [class]="blockCls(b)"
+                [style]="vid(b)"
+                (click)="onBlock($event, s, b)"
+              >
+                <app-video-embed [url]="b.url" [title]="b.title" [interactive]="isBlockSel(b)" />
               </div>
               @if (isBlockSel(b)) { <ng-container [ngTemplateOutlet]="tools" /> }
             </div>

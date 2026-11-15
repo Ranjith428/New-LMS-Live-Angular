@@ -1,0 +1,54 @@
+@if (v(); as vid) {
+  <div class="grid grid-flow-col grid-cols-2 grid-rows-2 gap-x-[12px] gap-y-[8px]">
+    <div class="contents">
+      <app-card title="Video Link">
+        <label class="flex h-[19px] items-center rounded-md bg-[#f1f1f1] px-2 text-[10px] focus-within:ring-1 focus-within:ring-[#6ec4cb]">
+          <input
+            type="text"
+            class="w-full bg-transparent text-[#555555] outline-none placeholder:text-[#767676]"
+            placeholder="Paste a YouTube or Vimeo link"
+            aria-label="Video link"
+            [value]="vid.url"
+            (input)="store.updateVideo({ url: $any($event.target).value })"
+          />
+        </label>
+        @if (status(); as st) {
+          <p class="text-[10px] leading-[14px]" [class]="st.ok ? 'text-[#2f7d4f]' : 'text-[#c0392b]'" [attr.role]="st.ok ? null : 'alert'">
+            {{ st.text }}
+          </p>
+        }
+      </app-card>
+      <app-card title="Title">
+        <label class="flex h-[19px] items-center rounded-md bg-[#f1f1f1] px-2 text-[10px] focus-within:ring-1 focus-within:ring-[#6ec4cb]">
+          <input
+            type="text"
+            class="w-full bg-transparent text-[#555555] outline-none placeholder:text-[#767676]"
+            placeholder="Describe the video"
+            aria-label="Video title"
+            [value]="vid.title"
+            (input)="store.updateVideo({ title: $any($event.target).value })"
+          />
+        </label>
+      </app-card>
+    </div>
+
+    <div class="contents">
+      <app-card title="Size">
+        <app-row label="Width">
+          <app-number suffix="%" [min]="1" [max]="100" [value]="vid.width" (changed)="store.updateVideo({ width: $event ?? 100 })" />
+        </app-row>
+        <app-row label="Height">
+          <app-number suffix="px" placeholder="Auto (16:9)" [min]="0" [value]="vid.height || null" (changed)="store.updateVideo({ height: $event ?? 0 })" />
+        </app-row>
+      </app-card>
+      <app-card title="Position">
+        <app-row label="Align">
+          <app-select [value]="vid.align" [options]="alignOptions" (changed)="store.updateVideo({ align: $any($event) })" />
+        </app-row>
+        <app-row label="Corner Radius">
+          <app-number suffix="px" [min]="0" [value]="vid.radius" (changed)="store.updateVideo({ radius: $event })" />
+        </app-row>
+      </app-card>
+    </div>
+  </div>
+}

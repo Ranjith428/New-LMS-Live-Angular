@@ -1,17 +1,24 @@
-<div class="ebook-root h-[calc(100vh-84px)] overflow-y-auto bg-white px-4 pb-8 pt-3 font-['DM_Sans',sans-serif] text-[#555555] sm:px-6 xl:px-10">
-  <div class="mx-auto w-full max-w-[1100px]">
-    <button
-      type="button"
-      class="mb-4 text-[13px] text-[#555555] outline-none hover:text-[#4fb3c8] focus-visible:ring-2 focus-visible:ring-[#6ec4cb]"
-      (click)="back()"
-    >
-      ‹ Back
-    </button>
+<!-- Same shell as Organize Modules: fitted height, px-4 / sm:px-6 / lg:px-10, Back header, white rounded card.
+     Only the card scrolls, so the Back header never moves. -->
+<div
+  class="ebook-root relative flex w-full flex-col px-4 pb-7 font-['DM_Sans',sans-serif] text-[#555555] sm:px-6 lg:px-10"
+  [style.height.px]="fitHeight()"
+>
+  <header class="relative flex min-h-14 w-full shrink-0 flex-wrap items-center justify-between gap-4 py-3">
+    <div class="flex items-center gap-8 text-xs">
+      <button
+        type="button"
+        class="flex items-center gap-1 text-neutral-600 outline-none hover:text-[#4fb3c8] focus-visible:ring-2 focus-visible:ring-[#6ec4cb]"
+        (click)="back()"
+      >
+        <span aria-hidden="true">‹</span> Back
+      </button>
+    </div>
+  </header>
 
-    <main class="rounded-[20px] bg-[#fefefe] p-4 pb-2 shadow-[0_2px_24px_rgba(0,0,0,.05)]">
-      <app-editor-panel />
-      <app-canvas />
-    </main>
-  </div>
+  <main class="ebook-scroll relative mb-5 min-h-0 w-full flex-1 overflow-y-auto rounded-2xl bg-white p-5 shadow-sm sm:p-6">
+    <app-editor-panel />
+    <app-canvas />
+  </main>
 </div>
 <app-add-section-modal />

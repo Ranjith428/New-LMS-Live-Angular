@@ -7,11 +7,11 @@ import { Icon } from './icon';
 @Component({
   selector: 'app-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { class: 'block' },
+  host: { class: 'block h-full' },
   template: `
-    <div class="rounded-2xl bg-white px-[17px] pb-[14px] pt-[15px]" [style.min-height.px]="minHeight()">
-      <h3 class="mb-[14px] text-[17px] font-medium leading-[22px] text-[#555555]">{{ title() }}</h3>
-      <div class="flex flex-col gap-[12px]"><ng-content /></div>
+    <div class="h-full rounded-2xl bg-white px-[14px] pb-[10px] pt-[11px]" [style.min-height.px]="minHeight()">
+      <h3 class="mb-[8px] text-[13px] font-medium leading-[18px] text-[#555555]">{{ title() }}</h3>
+      <div class="flex flex-col gap-[8px]"><ng-content /></div>
     </div>
   `,
 })
@@ -26,8 +26,8 @@ export class Card {
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block' },
   template: `
-    <div class="flex min-h-[24px] items-center justify-between gap-3">
-      <span class="text-[14px] leading-[18px] text-[#555555]">{{ label() }}</span>
+    <div class="flex min-h-[20px] items-center justify-between gap-3">
+      <span class="text-[11px] leading-[16px] text-[#555555]">{{ label() }}</span>
       <div [style.width.px]="width()" [class.shrink-0]="true"><ng-content /></div>
     </div>
   `,

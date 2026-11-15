@@ -1,56 +1,57 @@
-<div class="flex h-[298px] gap-[15px]">
+<div class="flex min-h-[200px] gap-[12px]">
   <!-- left: tool menu -->
-  <aside class="w-[272px] shrink-0 rounded-[20px] bg-[#f4f4f4] p-[9px]">
-    <div class="flex h-full flex-col gap-[14px] rounded-[16px] bg-white px-[16px] pt-[17px]">
+  <aside class="w-[190px] shrink-0 rounded-[20px] bg-[#f4f4f4] p-[8px]">
+    <div class="flex h-full flex-col gap-[10px] rounded-[16px] bg-white p-[12px]">
       <button type="button" class="pill" [class.is-active]="store.tab() === 'text'" (click)="store.tab.set('text')">Ebook Text</button>
       <button type="button" class="pill" [class.is-active]="store.tab() === 'layouts'" (click)="store.tab.set('layouts')">Layouts</button>
-      @for (n of samples; track $index) {
-        <div class="pill pill-sample" aria-hidden="true">Sample</div>
-      }
     </div>
   </aside>
 
-  <!-- right: properties -->
-  <section class="relative flex-1 rounded-[24px] bg-[#f4f4f4]">
-    <div class="ebook-scroll absolute inset-0 overflow-y-auto rounded-[24px] px-[28px] pb-[18px] pt-[22px]">
-      @if (store.tab() === 'layouts') {
-        <div class="rounded-2xl bg-white px-[17px] pb-[16px] pt-[15px]">
-          <h3 class="mb-3 text-[17px] font-medium leading-[22px] text-[#555555]">Layouts</h3>
-          <p class="mb-3 text-[12px] text-[#555555]">Pick a section type to add it at the end of the page.</p>
-          <div class="flex flex-wrap gap-2">
-            @for (c of categories; track c.id) {
-              <button type="button" class="h-[26px] rounded-lg bg-[#f1f1f1] px-3 text-[11px] text-[#555555] transition hover:bg-[#6ec4cb] hover:text-white"
-                      (click)="store.openAddSection(store.sections().length, c.id)">
-                {{ c.label }}
-              </button>
-            }
-          </div>
-        </div>
-      } @else {
-        @switch (store.selection()?.kind) {
-          @case ('text') { <app-text-panel /> }
-          @case ('image') { <app-image-panel /> }
-          @case ('section') { <app-section-panel /> }
-          @default {
-            <div class="rounded-2xl bg-white px-[17px] pb-[18px] pt-[15px]">
-              <h3 class="mb-2 text-[17px] font-medium leading-[22px] text-[#555555]">Properties</h3>
-              <p class="text-[13px] leading-[19px] text-[#555555]">
-                Click a <b>text</b>, an <b>image</b> or a <b>section</b> on the page below to edit its properties.
-              </p>
-            </div>
+  <!-- right: properties (grows with its content, so there is no vertical scroll inside the panel) -->
+  <section
+    class="relative min-w-0 flex-1 rounded-[24px] bg-[#f4f4f4] px-[20px] pt-[16px]"
+    [class]="store.pageCount() > 1 ? 'pb-[38px]' : 'pb-[14px]'"
+  >
+    @if (store.tab() === 'layouts') {
+      <div class="rounded-2xl bg-white px-[14px] pb-[12px] pt-[11px]">
+        <h3 class="mb-2 text-[13px] font-medium leading-[18px] text-[#555555]">Layouts</h3>
+        <p class="mb-2 text-[10px] text-[#555555]">Pick a section type to add it at the end of the page.</p>
+        <div class="flex flex-wrap gap-2">
+          @for (c of categories; track c.id) {
+            <button type="button" class="h-[24px] rounded-lg bg-[#f1f1f1] px-3 text-[10px] text-[#555555] transition hover:bg-[#6ec4cb] hover:text-white"
+                    (click)="store.openAddSection(store.sections().length, c.id)">
+              {{ c.label }}
+            </button>
           }
+        </div>
+      </div>
+    } @else {
+      @switch (store.selection()?.kind) {
+        @case ('text') { <app-text-panel /> }
+        @case ('image') { <app-image-panel /> }
+        @case ('video') { <app-video-panel /> }
+        @case ('section') { <app-section-panel /> }
+        @default {
+          <div class="rounded-2xl bg-white px-[14px] pb-[12px] pt-[11px]">
+            <h3 class="mb-1 text-[13px] font-medium leading-[18px] text-[#555555]">Properties</h3>
+            <p class="text-[11px] leading-[16px] text-[#555555]">
+              Click a <b>text</b>, an <b>image</b> or a <b>section</b> on the page below to edit its properties.
+            </p>
+          </div>
         }
       }
-    </div>
+    }
 
     <!-- pager notch -->
-    <div class="absolute -bottom-0 right-0 z-10 flex h-[48px] w-[100px] items-center justify-center gap-[18px] rounded-tl-[24px] rounded-br-[24px] bg-[#f0f0f0]">
-      <button type="button" class="pager" aria-label="Previous properties" [disabled]="store.page() === 0" (click)="store.prevPage()">
-        <app-icon name="tri-left" class="size-[18px]" />
-      </button>
-      <button type="button" class="pager" aria-label="Next properties" [disabled]="store.page() >= store.pageCount() - 1" (click)="store.nextPage()">
-        <app-icon name="tri-right" class="size-[18px]" />
-      </button>
-    </div>
+    @if (store.pageCount() > 1) {
+      <div class="absolute bottom-0 right-0 z-10 flex h-[34px] w-[76px] items-center justify-center gap-[12px] rounded-tl-[20px] rounded-br-[24px] bg-[#f0f0f0]">
+        <button type="button" class="pager" aria-label="Previous properties" [disabled]="store.page() === 0" (click)="store.prevPage()">
+          <app-icon name="tri-left" class="size-[14px]" />
+        </button>
+        <button type="button" class="pager" aria-label="Next properties" [disabled]="store.page() >= store.pageCount() - 1" (click)="store.nextPage()">
+          <app-icon name="tri-right" class="size-[14px]" />
+        </button>
+      </div>
+    }
   </section>
 </div>
