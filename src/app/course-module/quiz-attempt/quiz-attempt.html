@@ -47,10 +47,15 @@
         @if (actionError()) {
           <p class="mx-auto mt-3 max-w-md rounded-xl bg-red-50 px-4 py-2 text-[11px] text-red-700" role="alert">{{ actionError() }}</p>
         }
+        @if (attempt()?.locked) {
+          <p class="mx-auto mt-3 max-w-md rounded-xl bg-[#f3f3f3] px-4 py-2 text-[11px] text-[#5e6769]" role="status">
+            {{ attempt()?.lockedMessage || 'Complete all the content of this section first to unlock the quiz.' }}
+          </p>
+        }
         <button
           type="button"
           class="mt-4 h-[34px] min-w-[122px] rounded-full bg-[#61b7c5] px-6 text-[11px] font-medium text-white outline-none transition-colors hover:bg-[#489daa] focus-visible:ring-2 focus-visible:ring-[#61b7c5]/60 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-          [disabled]="busy()"
+          [disabled]="busy() || attempt()?.locked"
           (click)="startQuiz()"
         >{{ busy() ? 'Starting…' : 'Start Quiz' }}</button>
       </div>

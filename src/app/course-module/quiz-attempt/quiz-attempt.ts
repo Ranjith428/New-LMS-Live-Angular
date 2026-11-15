@@ -69,6 +69,8 @@ export class QuizAttemptPage implements OnInit, OnDestroy {
   readonly embedded = input(false);
   /** Embedded only: 'course' = back to the course, a number = open that next course section. */
   readonly leave = output<'course' | number>();
+  /** Embedded only: the quiz was submitted - the parent refreshes the learner's progress. */
+  readonly quizFinished = output<void>();
 
   private courseId = 0;
   private courseSectionId = 0;
@@ -631,6 +633,7 @@ export class QuizAttemptPage implements OnInit, OnDestroy {
         this.elapsedSeconds.set(attempt.elapsedSeconds);
         this.busy.set(false);
         this.confirm.set(null);
+        this.quizFinished.emit();
       },
       error: (error) => this.failAction(error, 'The quiz could not be submitted. Please try again.'),
     });

@@ -181,6 +181,18 @@ export class CoursePreview implements OnInit, AfterViewInit {
     return this.progress()?.sections.find(i => i.sectionId === section.id)?.status ?? 'NOT_STARTED';
   }
 
+  /** A module opens only after the previous module is completed (learners only). */
+  isLocked(section: Section): boolean {
+    return this.progress()?.sections.find(i => i.sectionId === section.id)?.locked === true;
+  }
+
+  /** The module before this one (for the "Complete Module 01 to unlock" hint). */
+  previousModuleLabel(section: Section): string {
+    const list = this.sections();
+    const previous = list[list.findIndex(s => s.id === section.id) - 1];
+    return previous ? previous.sectionOrder.toString().padStart(2, '0') : '';
+  }
+
   /** 0-100 for the ring. */
   percentOf(section: Section): number {
     const value = this.progress()?.sections.find(i => i.sectionId === section.id)?.percent ?? 0;
@@ -194,6 +206,7 @@ export class CoursePreview implements OnInit, AfterViewInit {
   }
 
   statusLabel(section: Section): string {
+    if (this.isLocked(section)) return `Locked - complete module ${this.previousModuleLabel(section)} first`;
     const percent = this.percentOf(section);
     if (percent >= 100) return 'Completed';
     return percent > 0 ? `${percent}% completed` : 'Not started';
@@ -213,7 +226,7 @@ export class CoursePreview implements OnInit, AfterViewInit {
   /** Clicking a module row opens the content viewer (E-Book / Multimedia / Question Banks) for that section. */
   openSection(section: Section): void {
     const course = this.course();
-    if (!course) return;
+    if (!course || this.isLocked(section)) return;
     void this.router.navigate([
       '/admin-dashboard',
       'courses',

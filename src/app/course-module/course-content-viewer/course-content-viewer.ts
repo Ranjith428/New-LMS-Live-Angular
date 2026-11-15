@@ -97,14 +97,9 @@ export class CourseContentViewer implements OnInit, AfterViewInit {
 
   // ---------- data ----------
   readonly sections = signal<Section[]>([]);
-  /** Learner progress (tracked = false for admins / instructors: the Complete button is hidden). */
+  /** Learner progress (tracked = false for admins / instructors: no completion marks and no quiz lock). */
   readonly progress = signal<CourseProgress | null>(null);
-  readonly savingProgress = signal(false);
   readonly canTrackProgress = computed(() => this.progress()?.tracked === true);
-  readonly currentSectionCompleted = computed(() => {
-    const id = this.selectedSectionId();
-    return this.progress()?.sections.find(i => i.sectionId === id)?.status === 'COMPLETED';
-  });
   readonly selectedSectionId = signal<number | null>(null);
   readonly tabs = signal<ContentTab[]>([]);
   readonly activeTabKey = signal<string>('');
@@ -204,7 +199,7 @@ export class CourseContentViewer implements OnInit, AfterViewInit {
       if (token === this.docxToken) {
         this.docxLoading.set(false);
         // a short document that fits on screen counts as fully read; a long one counts what is visible
-        setTimeout(() => this.updateDocxFraction(host), 300);
+        setTimeout(() => this.updateDocxProgress(host), 300);
       }
     }
   }
@@ -310,9 +305,9 @@ export class CourseContentViewer implements OnInit, AfterViewInit {
     this.selectedSectionId.set(Number(this.route.snapshot.paramMap.get('sectionId')) || null);
     this.loadCourseThumbnail();
     this.loadSections();
-    this.markCurrentSection('IN_PROGRESS');
+    this.loadProgress();
     // save the last bit of progress when the learner leaves the page
-    this.destroyRef.onDestroy(() => this.flushSave());
+    this.destroyRef.onDestroy(() => this.flushAllProgress());
   }
 
   ngAfterViewInit(): void {
@@ -463,11 +458,28 @@ export class CourseContentViewer implements OnInit, AfterViewInit {
     this.openSection(id);
   }
 
+  /** A module is locked until the previous one is completed (learners only). */
+  isSectionLocked(section: Section): boolean {
+    return this.progress()?.sections.find(i => i.sectionId === section.id)?.locked === true;
+  }
+
+  sectionOptionLabel(section: Section): string {
+    return this.isSectionLocked(section) ? `${this.sectionLabel(section)} (locked)` : this.sectionLabel(section);
+  }
+
+  /** Opened a locked module (old link / typed URL)? Move to the first module the learner may open. */
+  private guardLockedSection(p: CourseProgress): void {
+    const current = this.selectedSectionId();
+    if (!p.tracked || !p.sections.find(s => s.sectionId === current)?.locked) return;
+    const target = p.sections.find(s => !s.locked && s.status !== 'COMPLETED') ?? p.sections.find(s => !s.locked);
+    if (target && target.sectionId !== current) this.openSection(target.sectionId);
+  }
+
   /** Switches to another course section (dropdown, or "Go to next unit" from the embedded quiz). */
   private openSection(id: number): void {
-    this.flushSave();
+    if (this.progress()?.sections.find(s => s.sectionId === id)?.locked) return;
+    this.flushAllProgress();
     this.selectedSectionId.set(id);
-    this.markCurrentSection('IN_PROGRESS');
     // keep the URL in sync so a refresh stays on the same section (no extra history entry)
     void this.router.navigate(
       ['/admin-dashboard', 'courses', this.courseId, 'sections', id, 'content'],
@@ -485,136 +497,177 @@ export class CourseContentViewer implements OnInit, AfterViewInit {
     }
   }
 
-  /**
-   * Learner progress: opening a module marks it In progress, the button marks it Completed.
-   * Failures are ignored for IN_PROGRESS (the content still opens); the button shows nothing for admins.
-   */
-  private markCurrentSection(status: 'IN_PROGRESS' | 'COMPLETED'): void {
-    const sectionId = this.selectedSectionId();
-    if (!this.courseId || sectionId === null) return;
-    this.savingProgress.set(true);
+  // ---------- learner progress & quiz lock ----------
+  //
+  // Rule: every content item of a section (multimedia files, e-books later) must be COMPLETED before the quiz
+  // of that section opens. An item is completed only when the learner really went through it:
+  //   video / audio ......... played to the end (skipping ahead does not count)
+  //   Word (.docx) .......... scrolled down to the end
+  //   image ................. shown
+  //   PDF / PowerPoint / Excel / other ... these open in another site's viewer (iframe): the browser cannot tell how
+  //                           far the learner got, so the learner confirms with "I've finished reading".
+  // The quiz counts only after it is SUBMITTED (the server records that); opening it and leaving does nothing.
+
+  private static readonly SAVE_INTERVAL_MS = 3000;
+
+  /** Best percent seen in this visit per multimedia item id (shows instantly, before the server has answered). */
+  private readonly localPercent = signal<ReadonlyMap<number, number>>(new Map());
+  private readonly pendingPercent = new Map<number, { sectionId: number; percent: number }>();
+  private readonly saveTimers = new Map<number, ReturnType<typeof setTimeout>>();
+  private readonly lastSaveAt = new Map<number, number>();
+  /** video / audio: seconds really played per item id, and the last playback position seen. */
+  private readonly watchedSeconds = new Map<number, number>();
+  private readonly lastPosition = new Map<number, number>();
+
+  /** Loads the learner's progress (rings, completed items). Admins / instructors get tracked = false. */
+  loadProgress(): void {
+    if (!this.courseId) return;
     this.progressService
-      .update(this.courseId, sectionId, { status })
+      .getProgress(this.courseId)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: p => {
           this.progress.set(p);
-          this.savingProgress.set(false);
+          this.guardLockedSection(p);
         },
-        error: () => this.savingProgress.set(false),
+        error: () => this.progress.set(null), // without progress the content still opens, just without locks
       });
   }
 
-  // ---------- percent progress (0-100 %, moves in small steps while the learner watches / reads) ----------
-  //
-  // Each tab of the module is worth (100 / number of tabs) %. How much of a tab counts:
-  //   video / audio ......... how far the playback has got (currentTime / duration)
-  //   Word (.docx) .......... how far the learner has scrolled
-  //   image, PDF, Office, quiz, other .. 100 % as soon as the tab is opened (these viewers are embedded
-  //                            iframes of other sites, the browser cannot tell how far the learner got)
-  // Module percent = sum of the tab shares. It is sent to the server at most every few seconds; the server
-  // only ever raises a module's percent.
+  /** What the server has stored for one item. */
+  private serverPercent(type: 'MULTIMEDIA' | 'QUIZ', itemId: number): number {
+    return this.progress()?.items.find(i => i.itemType === type && i.itemId === itemId)?.percent ?? 0;
+  }
 
-  private static readonly SAVE_INTERVAL_MS = 3000;
+  /** 0-100 of a tab: its multimedia file, or the quiz (100 only after it was submitted). */
+  tabPercent(tab: ContentTab): number {
+    if (tab.kind === 'Question Bank') return tab.bankId ? this.serverPercent('QUIZ', tab.bankId) : 0;
+    const id = tab.resource?.id;
+    if (!id) return 0;
+    return Math.max(this.serverPercent('MULTIMEDIA', id), this.localPercent().get(id) ?? 0);
+  }
 
-  /** tab key -> 0..1 share seen in this visit, for the section named in fractionsSectionId. */
-  private fractions = new Map<string, number>();
-  private fractionsSectionId: number | null = null;
-  private readonly lastSent = new Map<number, number>();
-  private pending: { sectionId: number; percent: number } | null = null;
-  private saveTimer: ReturnType<typeof setTimeout> | null = null;
-  private lastSaveAt = 0;
+  isDone(tab: ContentTab | null | undefined): boolean {
+    return !!tab && this.tabPercent(tab) >= 100;
+  }
 
-  /** Re-runs when the active tab / its viewer changes (or once progress tracking is known to apply, i.e. a learner). */
-  private readonly trackTabViews = effect(() => {
-    const tab = this.activeTab();
-    const media = this.activeMedia();
-    if (!tab || !this.canTrackProgress()) return;
-    const reportsOwnProgress =
-      tab.kind === 'Multimedia' && (media?.kind === 'video' || media?.kind === 'audio' || media?.kind === 'docx');
-    untracked(() => {
-      this.setTabFraction(tab.key, reportsOwnProgress ? 0 : 1);
-    });
+  /** Content tabs (not quizzes) of the current section that the learner has not completed yet. */
+  readonly remainingTabs = computed(() =>
+    this.canTrackProgress() ? this.tabs().filter(t => t.kind === 'Multimedia' && this.tabPercent(t) < 100) : [],
+  );
+
+  /** The quiz stays locked until every content tab of the section is completed (learners only). */
+  readonly quizLocked = computed(() => this.canTrackProgress() && this.remainingTabs().length > 0);
+
+  /** PDF / PowerPoint / Excel / other files: the learner confirms with a button (see the rule above). */
+  readonly needsManualCompletion = computed(() => {
+    const kind = this.activeMedia()?.kind;
+    return this.canTrackProgress() && (kind === 'pdf' || kind === 'office' || kind === 'other');
   });
 
-  /** Video / audio: called on every timeupdate. */
-  onMediaProgress(event: Event): void {
+  /** "I've finished reading" button. */
+  markItemDone(): void {
+    const id = this.activeTab()?.resource?.id;
+    if (id) this.setPercent(id, 100);
+  }
+
+  /** Image: shown = completed. */
+  onImageLoaded(): void {
+    const id = this.activeTab()?.resource?.id;
+    if (id) this.setPercent(id, 100);
+  }
+
+  /** Video / audio, on every timeupdate: only natural playback counts as watched. */
+  onMediaTime(event: Event): void {
+    const id = this.activeTab()?.resource?.id;
     const el = event.target as HTMLMediaElement;
-    if (!this.canTrackProgress() || !el.duration || !Number.isFinite(el.duration)) return;
-    this.setTabFraction(this.activeTabKey(), el.currentTime / el.duration);
+    if (!id || !this.canTrackProgress() || !el.duration || !Number.isFinite(el.duration)) return;
+    const duration = el.duration;
+    // first time in this visit: continue from what the server already knows
+    let watched = this.watchedSeconds.get(id) ?? (this.tabPercentById(id) / 100) * duration;
+    const delta = el.currentTime - (this.lastPosition.get(id) ?? el.currentTime);
+    this.lastPosition.set(id, el.currentTime);
+    // normal playback moves forward a little each tick; a jump (seeking ahead) is ignored
+    if (!el.seeking && delta >= 0 && delta <= 2.5 && el.currentTime <= watched + 2.5) {
+      watched = Math.max(watched, el.currentTime);
+    }
+    this.watchedSeconds.set(id, watched);
+    this.setPercent(id, watched >= duration - 1.5 ? 100 : Math.min(99, (watched / duration) * 100));
   }
 
-  onMediaEnded(): void {
-    if (this.canTrackProgress()) this.setTabFraction(this.activeTabKey(), 1);
+  /** Video / audio reached its end: completed only if it was really played (not skipped to the end). */
+  onMediaEnded(event: Event): void {
+    const id = this.activeTab()?.resource?.id;
+    const el = event.target as HTMLMediaElement;
+    if (!id || !this.canTrackProgress() || !el.duration || !Number.isFinite(el.duration)) return;
+    if ((this.watchedSeconds.get(id) ?? 0) >= el.duration - 3) this.setPercent(id, 100);
   }
 
-  /** Word document: how far down the learner has scrolled. */
+  /** Word document: completed when the learner has scrolled to the end. */
   onDocxScroll(event: Event): void {
-    this.updateDocxFraction(event.target as HTMLElement);
+    this.updateDocxProgress(event.target as HTMLElement);
   }
 
-  private updateDocxFraction(el: HTMLElement): void {
-    if (!this.canTrackProgress() || this.docxLoading() || !el.scrollHeight) return;
+  private updateDocxProgress(el: HTMLElement): void {
+    const id = this.activeTab()?.resource?.id;
+    if (!id || !this.canTrackProgress() || this.docxLoading() || !el.scrollHeight) return;
     const fitsOnScreen = el.scrollHeight - el.clientHeight <= 4; // short document: all of it is visible
-    const seen = fitsOnScreen ? 1 : (el.scrollTop + el.clientHeight) / el.scrollHeight;
-    this.setTabFraction(this.activeTabKey(), seen);
+    const atEnd = el.scrollHeight - el.clientHeight - el.scrollTop <= 8;
+    this.setPercent(id, fitsOnScreen || atEnd ? 100 : Math.min(99, ((el.scrollTop + el.clientHeight) / el.scrollHeight) * 100));
   }
 
-  private fractionsFor(sectionId: number): Map<string, number> {
-    if (this.fractionsSectionId !== sectionId) {
-      this.flushSave(); // send what the previous section had before starting a new tally
-      this.fractionsSectionId = sectionId;
-      this.fractions = new Map<string, number>();
-    }
-    return this.fractions;
+  private tabPercentById(resourceId: number): number {
+    return Math.max(this.serverPercent('MULTIMEDIA', resourceId), this.localPercent().get(resourceId) ?? 0);
   }
 
-  private setTabFraction(key: string, fraction: number): void {
+  /** Raises one item's percent. It shows at once; it is sent to the server at most every few seconds (at once at 100). */
+  private setPercent(resourceId: number, percent: number): void {
     const sectionId = this.selectedSectionId();
-    const total = this.tabs().length;
-    if (!this.courseId || sectionId === null || !key || total === 0) return;
-    const map = this.fractionsFor(sectionId);
-    const value = Math.max(0, Math.min(1, fraction));
-    if (value <= (map.get(key) ?? -1)) return; // only ever goes up
-    map.set(key, value);
-    let sum = 0;
-    map.forEach(v => (sum += v));
-    this.queueSave(sectionId, Math.min(100, Math.round((sum / total) * 100)));
-  }
-
-  private queueSave(sectionId: number, percent: number): void {
-    const saved = this.progress()?.sections.find(i => i.sectionId === sectionId)?.percent ?? 0;
-    if (percent <= Math.max(saved, this.lastSent.get(sectionId) ?? 0)) return; // nothing new to save
-    this.pending = { sectionId, percent };
-    const wait = CourseContentViewer.SAVE_INTERVAL_MS - (Date.now() - this.lastSaveAt);
-    if (percent >= 100 || wait <= 0) {
-      this.flushSave();
-    } else if (!this.saveTimer) {
-      this.saveTimer = setTimeout(() => this.flushSave(), wait);
+    if (!this.courseId || sectionId === null || !this.canTrackProgress()) return;
+    const value = Math.max(0, Math.min(100, Math.floor(percent)));
+    if (value <= this.tabPercentById(resourceId)) return; // only ever goes up
+    this.localPercent.update(m => new Map(m).set(resourceId, value));
+    this.pendingPercent.set(resourceId, { sectionId, percent: value });
+    const wait = CourseContentViewer.SAVE_INTERVAL_MS - (Date.now() - (this.lastSaveAt.get(resourceId) ?? 0));
+    if (value >= 100 || wait <= 0) {
+      this.flushItem(resourceId);
+    } else if (!this.saveTimers.has(resourceId)) {
+      this.saveTimers.set(resourceId, setTimeout(() => this.flushItem(resourceId), wait));
     }
   }
 
-  /** Sends the latest pending percent now (also used when the section changes and when the page closes). */
-  private flushSave(): void {
-    if (this.saveTimer) {
-      clearTimeout(this.saveTimer);
-      this.saveTimer = null;
+  private flushItem(resourceId: number): void {
+    const timer = this.saveTimers.get(resourceId);
+    if (timer) {
+      clearTimeout(timer);
+      this.saveTimers.delete(resourceId);
     }
-    const job = this.pending;
-    if (!job || !this.courseId) return;
-    this.pending = null;
-    this.lastSaveAt = Date.now();
-    this.lastSent.set(job.sectionId, job.percent);
-    this.progressService.update(this.courseId, job.sectionId, { percent: job.percent }).subscribe({
+    const job = this.pendingPercent.get(resourceId);
+    if (!job) return;
+    this.pendingPercent.delete(resourceId);
+    this.lastSaveAt.set(resourceId, Date.now());
+    this.progressService.updateItem(this.courseId, job.sectionId, resourceId, job.percent).subscribe({
       next: p => this.progress.set(p),
-      error: () => this.lastSent.delete(job.sectionId), // progress is best-effort; try again on the next change
+      error: () => {
+        // not saved: take the local mark back so the quiz does not look unlocked when the server would refuse it
+        this.localPercent.update(m => {
+          const next = new Map(m);
+          next.delete(resourceId);
+          return next;
+        });
+        this.lastSaveAt.delete(resourceId);
+      },
     });
   }
 
-  /** "Mark as completed" button. */
-  completeCurrentSection(): void {
-    if (this.savingProgress() || this.currentSectionCompleted()) return;
-    this.markCurrentSection('COMPLETED');
+  /** Sends everything still waiting (section change, page close). */
+  private flushAllProgress(): void {
+    [...this.pendingPercent.keys()].forEach(id => this.flushItem(id));
+  }
+
+  /** The embedded quiz was submitted: the section / course progress changed. */
+  onQuizFinished(): void {
+    this.loadProgress();
   }
 
   selectTab(key: string): void {

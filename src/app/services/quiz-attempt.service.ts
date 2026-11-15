@@ -53,6 +53,9 @@ export interface QuizAttempt {
   nextSectionId: number | null;
   /** ISO date-time the quiz was finished (SUBMITTED only). */
   submittedAt: string | null;
+  /** NOT_STARTED only: the learner has not completed all the content of this section yet. */
+  locked?: boolean;
+  lockedMessage?: string | null;
   /** Seconds since the attempt started (frozen once submitted). */
   elapsedSeconds: number;
   /** Only after the quiz is finished. */
