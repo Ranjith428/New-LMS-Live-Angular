@@ -57,6 +57,12 @@ export const routes: Routes = [
             ),
           title: 'Dashboard',
         },
+        {
+          path: 'admin-list',
+          loadComponent: () =>
+            import('./admin-management/admin-list/admin-list').then((m) => m.AdminList),
+          title: 'Admin List',
+        },
 
 
       { path: '', redirectTo: 'package', pathMatch: 'full' },
@@ -251,6 +257,13 @@ export const routes: Routes = [
   loadComponent: () =>
     import('./profile/edit-profile/edit-profile').then((m) => m.EditProfile),
   title: 'Edit Profile',
+},
+
+{
+  path: 'general-settings',
+  loadComponent: () =>
+    import('./profile/settings/general-settings/general-settings').then((m) => m.GeneralSettings),
+  title: 'General Settings',
 },
 
 // NEW - Change Password (opens as a modal dialog on top of the dashboard)
