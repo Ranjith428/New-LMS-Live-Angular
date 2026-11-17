@@ -79,8 +79,8 @@ export class PaymentGateway implements OnInit {
     number: new FormControl('', { nonNullable: true, validators: [Validators.required, cardNumberLength] }),
     expiry: new FormControl('', { nonNullable: true, validators: [Validators.required, notExpired] }),
     cvc: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.pattern(/^\d{3,4}$/)] }),
-    firstName: new FormControl('', { nonNullable: true }),
-    lastName: new FormControl('', { nonNullable: true }),
+    firstName: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(50)] }),
+    lastName: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(50)] }),
   });
   protected readonly verificationForm = new FormGroup({
     code: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.pattern(/^\d{4,8}$/)] }),
@@ -105,22 +105,26 @@ export class PaymentGateway implements OnInit {
   protected readonly billingForm = new FormGroup({
     country: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
     email: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.email, Validators.maxLength(100)] }),
-    firstName: new FormControl('', { nonNullable: true }),
-    lastName: new FormControl('', { nonNullable: true }),
-    companyName: new FormControl('', { nonNullable: true }),
+    firstName: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(50)] }),
+    lastName: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(50)] }),
+    companyName: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(100)] }),
     address: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(200)] }),
     city: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(100)] }),
-    postalCode: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(100)] }),
-    state: new FormControl('', { nonNullable: true }),
+    postalCode: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(20)] }),
+    state: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(100)] }),
     acceptedTerms: new FormControl(false, { nonNullable: true, validators: [Validators.requiredTrue] }),
   });
 
   private readonly billingMessages: Record<string, Record<string, string>> = {
     country: { required: 'Please select a country.' },
     email: { required: 'Billing email is required.', email: 'Enter a valid email address.' },
+    firstName: { maxlength: 'Maximum Length 50 Characters.' },
+    lastName: { maxlength: 'Maximum Length 50 Characters.' },
+    companyName: { maxlength: 'Maximum Length 100 Characters.' },
     address: { required: 'Billing address is required.' },
     city: { required: 'City is required.' },
     postalCode: { required: 'Postal code is required.' },
+    state: { maxlength: 'Maximum Length 100 Characters.' },
     acceptedTerms: { required: 'You must accept the Terms of Service and Privacy Policy.' },
   };
 
@@ -176,7 +180,7 @@ export class PaymentGateway implements OnInit {
     password: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
   });
   protected readonly paypalForm = new FormGroup({
-    emailOrMobile: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.minLength(5)] }),
+    emailOrMobile: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.email, Validators.maxLength(100)] }),
     password: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
   });
 
@@ -283,10 +287,28 @@ export class PaymentGateway implements OnInit {
 
   // ---- Billing helpers -----------------------------------------------------------
 
-  protected controlError(name: 'country' | 'email' | 'address' | 'city' | 'postalCode' | 'acceptedTerms'): string {
+  protected controlError(name: 'country' | 'email' | 'firstName' | 'lastName' | 'companyName' | 'address' | 'city' | 'postalCode' | 'state' | 'acceptedTerms'): string {
     const control = this.billingForm.controls[name];
-    if (!control.touched || !control.invalid) return '';
+    if (!control.touched && !control.dirty) return '';
+    const maxLengths: Partial<Record<typeof name, number>> = {
+      firstName: 50,
+      lastName: 50,
+      companyName: 100,
+      address: 200,
+      city: 100,
+      postalCode: 20,
+      state: 100,
+    };
+    const maxLength = maxLengths[name];
+    if (maxLength !== undefined && typeof control.value === 'string' && control.value.length >= maxLength) {
+      return `Maximum Length ${maxLength} Characters.`;
+    }
+    if (!control.invalid) return '';
     const key = Object.keys(control.errors ?? {})[0];
+    if (key === 'maxlength') {
+      const maxLength = control.errors?.['maxlength']?.requiredLength as number;
+      return `Maximum Length ${maxLength} Characters.`;
+    }
     return this.billingMessages[name]?.[key] ?? 'This value is not valid.';
   }
 
@@ -388,6 +410,8 @@ export class PaymentGateway implements OnInit {
       number: 'Card number',
       expiry: 'Expiry (MM/YY)',
       cvc: 'CVC',
+      firstName: 'First name',
+      lastName: 'Last name',
     };
     const billingLabels: Record<string, string> = {
       country: 'Country',

@@ -305,7 +305,8 @@
 
 /* Validation text stays small and under the field */
 .pm-body span.gateway-error,
-.pm-billing span.gateway-error {
+.pm-billing span.gateway-error,
+.paypal-login-form span.gateway-error {
   display: block;
   margin-top: 6px;
   font-size: 10px;
