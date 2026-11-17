@@ -64,6 +64,15 @@ goBack(): void { this.location.back(); }
         takeUntilDestroyed(),
       )
       .subscribe();
+
+    // Online Users: tell the backend this browser is still open. Stops when the shell is destroyed
+    // (logout / leaving); a closed browser simply stops sending and goes offline after 2 minutes.
+    timer(0, 45_000)
+      .pipe(
+        switchMap(() => this.auth.sendHeartbeat().pipe(catchError(() => EMPTY))),
+        takeUntilDestroyed(),
+      )
+      .subscribe();
   }
 
 
@@ -302,8 +311,20 @@ if (/^\/admin-dashboard\/my-certificate\/?$/.test(path)) {
         { label: 'Change Password', link: null, plain: true },
       ];
     }
+
+        if (/^\/admin-dashboard\/settings\/?$/.test(path)) {
+          const home = this.isLearner() ? 'learner-dashboard-home' : 'admin-dashboard-home';
+          return [
+            { label: 'Dashboard', link: ['/admin-dashboard', home], plain: true },
+            { label: 'Settings', link: null, plain: true },
+          ];
+        }
+
+
     return [];
   });
+
+  
 
   /** Finds a route param (e.g. `courseId`) anywhere in the activated route tree, falling back to the query string. */
   private findParam(name: string): string | null {

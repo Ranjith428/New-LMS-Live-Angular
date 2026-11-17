@@ -1,6 +1,6 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { HttpClient, HttpInterceptorFn, HttpParams } from '@angular/common/http';
-import { map, Observable, tap } from 'rxjs';
+import { EMPTY, map, Observable, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { TokenStorageService } from './token-storage.service';
 import { catchError, throwError } from 'rxjs';
@@ -278,7 +278,20 @@ export class AuthService {
     return this.tokenStorage.getToken();
   }
 
+  /** POST /api/auth/heartbeat - "this browser is still open" (dashboard Online Users). No-op when logged out. */
+  sendHeartbeat(): Observable<unknown> {
+    return this.tokenStorage.getToken() ? this.http.post(`${this.apiUrl}/heartbeat`, {}) : EMPTY;
+  }
+
   logout(): void {
+    // Best effort: tells the backend the user is offline (dashboard "Online Users"). The token is
+    // passed explicitly because it is cleared right below; a failure must never block the logout.
+    const token = this.tokenStorage.getToken();
+    if (token) {
+      this.http
+        .post(`${this.apiUrl}/logout`, {}, { headers: { Authorization: `Bearer ${token}` } })
+        .subscribe({ error: () => undefined });
+    }
     this.tokenStorage.clear();
     this.user.set(null);
   }

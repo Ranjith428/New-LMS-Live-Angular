@@ -2,6 +2,38 @@
 
 @import 'tailwindcss';
 
+@theme {
+  --font-dmsans: 'DM Sans', sans-serif;
+}
+
+@keyframes settings-fade-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [class*='animate-[settings-fade-up'] { animation: none !important; }
+}
+
+
+/* ===== 2FA Verification popup ===== */
+@keyframes tfa-fade-in  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes tfa-fade-out { from { opacity: 1; } to { opacity: 0; } }
+
+@keyframes tfa-pop-in {
+  from { opacity: 0; transform: translateY(18px) scale(0.94); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes tfa-pop-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateY(10px) scale(0.96); }
+}
+
+@keyframes tfa-item-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* Ebook editor font choices */
 @import '@fontsource/dm-sans/latin-400.css';
 @import '@fontsource/dm-sans/latin-500.css';
@@ -339,3 +371,4 @@ app-payment-gateway #discount-code {
 }
 app-payment-gateway #discount-code::placeholder { color: #b3b3b3; }
 app-payment-gateway #discount-code:focus { outline: none; box-shadow: inset 0 0 0 2px #319eaf; border-radius: 14px; }
+

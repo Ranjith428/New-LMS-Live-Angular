@@ -270,6 +270,13 @@ export const routes: Routes = [
   title: 'Change Password',
 },
 
+{
+  path: 'settings',
+  loadComponent: () =>
+    import('./profile/settings/settings-menu/settings-menu').then((m) => m.SettingsMenu),
+  title: 'Settings',
+},
+
     ],
   },
 
