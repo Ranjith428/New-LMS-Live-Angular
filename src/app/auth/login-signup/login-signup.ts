@@ -19,7 +19,7 @@ import {
 } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TimeoutError, finalize, timeout } from 'rxjs';
-import { AuthService } from '../../services/auth';
+import { AuthService, TwoFactorChallenge } from '../../services/auth';
 import { homeRouteFor } from '../../guards/role.guard';
 import { InviteService, getInviteErrorMessage } from '../../services/invite.service';
 import { DOCUMENT, NgTemplateOutlet } from '@angular/common';
@@ -59,6 +59,7 @@ const COUNTRY_CODES = Object.keys(PHONE_LENGTHS_BY_COUNTRY_CODE);
 
 // Forgot-password settings (moved here from the old standalone page)
 const RESEND_COOLDOWN_SECONDS = 30;
+const OTP_LENGTH = 6;
 const REQUEST_TIMEOUT_MS = 15000;
 
 type SignupField =
@@ -192,6 +193,16 @@ export class LoginSignup {
   protected readonly loggingIn = signal(false);
   protected readonly loginError = signal('');
 
+  /* ---- 2FA (e-mail OTP) step of login ---- */
+  /** Set after a correct password on an account with 2FA on; the OTP form replaces the password form. */
+  protected readonly twoFactor = signal<TwoFactorChallenge | null>(null);
+  protected readonly otpVerifying = signal(false);
+  protected readonly otpResending = signal(false);
+  protected readonly otpError = signal('');
+  protected readonly otpResendCooldown = signal(0);
+  protected readonly otpLength = OTP_LENGTH;
+  private otpCooldownTimer: ReturnType<typeof setInterval> | undefined;
+
   /* ---- Forgot-password state ---- */
   protected readonly forgotSubmitting = signal(false);
   protected readonly forgotCompleted = signal(false);
@@ -219,6 +230,13 @@ export class LoginSignup {
       ],
     }),
     rememberMe: new FormControl(false, { nonNullable: true }),
+  });
+
+  protected readonly otpForm = new FormGroup({
+    otp: new FormControl('', {
+      nonNullable: true,
+      validators: [Validators.required, Validators.pattern(/^\d{6}$/)],
+    }),
   });
 
   protected readonly forgotForm = new FormGroup({
@@ -310,7 +328,10 @@ export class LoginSignup {
       this.forgotCompleted.set(false);
     });
 
-    this.destroyRef.onDestroy(() => clearInterval(this.cooldownTimer));
+    this.destroyRef.onDestroy(() => {
+      clearInterval(this.cooldownTimer);
+      clearInterval(this.otpCooldownTimer);
+    });
 
     afterNextRender(() => this.initialiseFromRoute());
   }
@@ -536,11 +557,122 @@ export class LoginSignup {
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe({
-        next: ({ user }) => {
-          void this.router.navigate([homeRouteFor(user)]);
+        next: (outcome) => {
+          if (outcome.twoFactorRequired) {
+            // Password was right, but 2FA is on: no session yet - ask for the e-mailed code.
+            this.otpForm.reset();
+            this.otpError.set('');
+            this.twoFactor.set(outcome.challenge);
+            // Authenticator codes come from the app - there is nothing to resend.
+            if (outcome.challenge.method === 'EMAIL') this.startOtpCooldown();
+            return;
+          }
+          void this.router.navigate([homeRouteFor(outcome.user)]);
         },
         error: (error: HttpErrorResponse) => this.loginError.set(this.toLoginMessage(error)),
       });
+  }
+
+  /* ------------------------------------------------------------------------ */
+  /*  Login step 2 - e-mail OTP (only for accounts with 2FA on)               */
+  /* ------------------------------------------------------------------------ */
+
+  /** Keeps the OTP box numeric-only and clears the previous error while typing. */
+  protected onOtpInput(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const digits = input.value.replace(/\D/g, '').slice(0, OTP_LENGTH);
+    input.value = digits;
+    this.otpForm.controls.otp.setValue(digits);
+    this.otpError.set('');
+  }
+
+  protected submitOtp(): void {
+    const challenge = this.twoFactor();
+    this.otpForm.markAllAsTouched();
+    if (!challenge || this.otpForm.invalid || this.otpVerifying()) return;
+
+    this.otpVerifying.set(true);
+    this.otpError.set('');
+
+    this.auth
+      .verifyLoginOtp(
+        challenge.challengeToken,
+        this.otpForm.controls.otp.value,
+        this.loginForm.controls.rememberMe.value,
+      )
+      .pipe(
+        finalize(() => this.otpVerifying.set(false)),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: ({ user }) => {
+          this.leaveTwoFactor();
+          void this.router.navigate([homeRouteFor(user)]);
+        },
+        error: (error: HttpErrorResponse) => this.handleOtpError(error),
+      });
+  }
+
+  protected resendOtp(): void {
+    const challenge = this.twoFactor();
+    if (!challenge || this.otpResendCooldown() > 0 || this.otpResending()) return;
+
+    this.otpResending.set(true);
+    this.otpError.set('');
+
+    this.auth
+      .resendLoginOtp(challenge.challengeToken)
+      .pipe(
+        finalize(() => this.otpResending.set(false)),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: () => {
+          this.otpForm.reset();
+          this.startOtpCooldown();
+        },
+        error: (error: HttpErrorResponse) => this.handleOtpError(error),
+      });
+  }
+
+  /** "Back to login" - drops the pending challenge; the user has to enter the password again. */
+  protected cancelTwoFactor(): void {
+    this.leaveTwoFactor();
+    this.loginForm.controls.password.reset('');
+  }
+
+  private leaveTwoFactor(): void {
+    clearInterval(this.otpCooldownTimer);
+    this.otpResendCooldown.set(0);
+    this.otpForm.reset();
+    this.otpError.set('');
+    this.twoFactor.set(null);
+  }
+
+  private handleOtpError(error: HttpErrorResponse): void {
+    if (isNetworkOrServerError(error)) {
+      this.otpError.set('Unable to verify the code. Please try again later.');
+      return;
+    }
+    // 410: login session / code expired -> the challenge is gone, start again from the password.
+    if (error.status === 410) {
+      this.leaveTwoFactor();
+      this.loginForm.controls.password.reset('');
+      this.loginError.set('Your verification code has expired. Please log in again.');
+      return;
+    }
+    // 400 (wrong code) / 429 (cooldown, too many attempts) carry a short, safe backend message.
+    this.otpError.set(safeServerMessage(error, 'Invalid verification code.'));
+  }
+
+  private startOtpCooldown(): void {
+    clearInterval(this.otpCooldownTimer);
+    this.otpResendCooldown.set(RESEND_COOLDOWN_SECONDS);
+    this.otpCooldownTimer = setInterval(() => {
+      const next = this.otpResendCooldown() - 1;
+      this.otpResendCooldown.set(Math.max(next, 0));
+      if (next <= 0) clearInterval(this.otpCooldownTimer);
+    }, 1000);
   }
 
   /**

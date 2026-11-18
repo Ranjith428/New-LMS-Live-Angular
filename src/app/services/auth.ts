@@ -66,6 +66,20 @@ export interface LoginResponse {
   user: AuthUser;
 }
 
+/** Returned instead of a token when the password was right but the account has 2FA on. */
+export interface TwoFactorChallenge {
+  challengeToken: string;
+  /** e.g. j***@gmail.com - where the OTP was e-mailed (empty for AUTHENTICATOR). */
+  maskedEmail: string;
+  /** Which code the login screen has to ask for. */
+  method: 'EMAIL' | 'AUTHENTICATOR';
+}
+
+/** Result of step 1 of login: either logged in, or an OTP is needed (see verifyLoginOtp). */
+export type LoginOutcome =
+  | ({ twoFactorRequired: false } & LoginResponse)
+  | { twoFactorRequired: true; challenge: TwoFactorChallenge };
+
 interface ApiResponse<T> {
   success: boolean;
   message: string;
@@ -86,6 +100,10 @@ interface LoginApiData {
   companyAdmin?: boolean;
   permissions?: PermissionGrantApi[];
   menus?: string[];
+  twoFactorRequired?: boolean;
+  challengeToken?: string;
+  maskedEmail?: string;
+  twoFactorMethod?: 'EMAIL' | 'AUTHENTICATOR';
 }
 
 /** One row of the backend's permission list (PermissionDto.Grant). */
@@ -152,29 +170,68 @@ export class AuthService {
     this.user.set(this.normalizeUser(this.tokenStorage.getUser<AuthUser>()));
   }
 
-  login(credentials: { email: string; password: string; rememberMe: boolean }): Observable<LoginResponse> {
+  /**
+   * Step 1. If the account has 2FA on, nothing is stored yet and `twoFactorRequired` is true:
+   * the caller shows the OTP box and finishes with verifyLoginOtp().
+   */
+  login(credentials: { email: string; password: string; rememberMe: boolean }): Observable<LoginOutcome> {
     return this.http.post<ApiResponse<LoginApiData>>(`${this.apiUrl}/login`, credentials).pipe(
-      map(({ data }) => ({
-        token: data.token,
-        user: this.normalizeUser({
-          id: data.userId,
-          firstName: data.firstName,
-          lastName: data.lastName,
-          email: data.email,
-          role: data.role,
-          roles: data.roles ?? [],
-          instructorId: data.instructorId ?? null,
-          fullAccess: !!data.fullAccess,
-          companyAdmin: !!data.companyAdmin,
-          permissions: this.toPermissionMap(data.permissions),
-          menus: data.menus ?? [],
-        })!,
-      })),
-      tap((response) => {
-        this.tokenStorage.save(response.token, response.user, credentials.rememberMe);
-        this.user.set(response.user);
+      map(({ data }): LoginOutcome => {
+        if (data.twoFactorRequired) {
+          return {
+            twoFactorRequired: true,
+            challenge: {
+              challengeToken: data.challengeToken ?? '',
+              maskedEmail: data.maskedEmail ?? '',
+              method: data.twoFactorMethod ?? 'EMAIL',
+            },
+          };
+        }
+        return { twoFactorRequired: false, ...this.toLoginResponse(data) };
+      }),
+      tap((outcome) => {
+        if (!outcome.twoFactorRequired) this.startSession(outcome, credentials.rememberMe);
       }),
     );
+  }
+
+  /** Step 2 (2FA only) - POST /api/auth/2fa/login/verify. `rememberMe` only picks local vs session storage. */
+  verifyLoginOtp(challengeToken: string, otp: string, rememberMe: boolean): Observable<LoginResponse> {
+    return this.http
+      .post<ApiResponse<LoginApiData>>(`${this.apiUrl}/2fa/login/verify`, { challengeToken, otp })
+      .pipe(
+        map(({ data }) => this.toLoginResponse(data)),
+        tap((response) => this.startSession(response, rememberMe)),
+      );
+  }
+
+  /** POST /api/auth/2fa/login/resend - e-mails a fresh OTP for the same login attempt. */
+  resendLoginOtp(challengeToken: string): Observable<unknown> {
+    return this.http.post(`${this.apiUrl}/2fa/login/resend`, { challengeToken });
+  }
+
+  private toLoginResponse(data: LoginApiData): LoginResponse {
+    return {
+      token: data.token,
+      user: this.normalizeUser({
+        id: data.userId,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        role: data.role,
+        roles: data.roles ?? [],
+        instructorId: data.instructorId ?? null,
+        fullAccess: !!data.fullAccess,
+        companyAdmin: !!data.companyAdmin,
+        permissions: this.toPermissionMap(data.permissions),
+        menus: data.menus ?? [],
+      })!,
+    };
+  }
+
+  private startSession(response: LoginResponse, rememberMe: boolean): void {
+    this.tokenStorage.save(response.token, response.user, rememberMe);
+    this.user.set(response.user);
   }
 
   refreshProfile(): Observable<AuthUser> {
@@ -377,7 +434,9 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
   return next(req).pipe(
     catchError((error) => {
       // Login/signup request-ku 401 normal (wrong password), so skip pannrom.
-      const isAuthCall = request.url.includes('/api/auth/login') || request.url.includes('/api/auth/signup');
+      const isAuthCall = request.url.includes('/api/auth/login') ||
+        request.url.includes('/api/auth/signup') ||
+        request.url.includes('/api/auth/2fa/login');
       if (error?.status === 401 && token && !isAuthCall) {
         tokenStorage.clear();
         void router.navigate(['/auth'], { queryParams: { view: 'login' } });

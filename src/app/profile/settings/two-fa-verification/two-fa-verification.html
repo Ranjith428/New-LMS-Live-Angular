@@ -5,11 +5,23 @@
   (click)="onMainButton()"
   [attr.aria-pressed]="enabled()"
   aria-haspopup="dialog"
-  class="mt-3 inline-flex h-[26px] min-w-[74px] cursor-pointer items-center justify-center rounded-full px-4 text-[11px] font-medium text-white outline-none transition-all duration-300 hover:-translate-y-px hover:shadow-[0_6px_12px_-4px_rgba(70,148,164,0.6)] focus-visible:ring-2 focus-visible:ring-[#4694A4]/50 active:translate-y-0 active:scale-95 motion-reduce:transition-none"
+  [disabled]="!statusLoaded()"
+  class="mt-3 disabled:cursor-not-allowed disabled:opacity-60 inline-flex h-[26px] min-w-[74px] cursor-pointer items-center justify-center rounded-full px-4 text-[11px] font-medium text-white outline-none transition-all duration-300 hover:-translate-y-px hover:shadow-[0_6px_12px_-4px_rgba(70,148,164,0.6)] focus-visible:ring-2 focus-visible:ring-[#4694A4]/50 active:translate-y-0 active:scale-95 motion-reduce:transition-none"
   [class]="enabled() ? 'bg-[#4694A4]' : 'bg-[#62b9c8]'"
 >
   {{ enabled() ? 'Turn Off' : 'Turn On' }}
 </button>
+
+@if (statusLoaded() && enabled()) {
+  @if (currentMethod() === 'AUTHENTICATOR') {
+    <p class="mt-2 text-[11px] text-[#555]">Google Authenticator is on.</p>
+  } @else {
+    <p class="mt-2 text-[11px] text-[#555]">Email verification is on. Codes are sent to {{ maskedEmail() }}.</p>
+  }
+}
+@if (!dialogOpen() && error()) {
+  <p class="mt-2 text-[11px] text-red-600" role="alert">{{ error() }}</p>
+}
 
 @if (dialogOpen()) {
   <!-- ============ Verification popup ============ -->
@@ -61,7 +73,7 @@
       <div class="-mx-1 mt-2 overflow-hidden px-1 pb-1">
         <div
           class="flex items-stretch transition-transform duration-500 ease-[cubic-bezier(0.65,0,0.35,1)] motion-reduce:transition-none"
-          [class]="step() === 'otp' ? '-translate-x-full' : 'translate-x-0'"
+          [class]="slideClass()"
         >
 
           <!-- ===== Step 1: choose method ===== -->
@@ -79,11 +91,14 @@
                   type="button"
                   role="radio"
                   [attr.aria-checked]="selected() === m.id"
+                  [attr.aria-disabled]="!m.available"
                   (click)="select(m.id)"
                   class="flex h-[42px] w-full animate-[tfa-item-in_450ms_cubic-bezier(0.22,0.61,0.36,1)_both] cursor-pointer items-center gap-3 rounded-xl px-4 text-left text-xs text-[#444] outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-[#4694A4]/40 motion-reduce:animate-none motion-reduce:transition-none"
-                  [class]="selected() === m.id
-                    ? 'bg-[#eef7f9] shadow-[inset_0_0_0_1px_rgba(98,185,200,0.45)]'
-                    : 'bg-[#f5f5f5] hover:bg-[#efefef]'"
+                  [class]="!m.available
+                    ? 'cursor-not-allowed bg-[#f5f5f5] opacity-50'
+                    : selected() === m.id
+                      ? 'bg-[#eef7f9] shadow-[inset_0_0_0_1px_rgba(98,185,200,0.45)]'
+                      : 'bg-[#f5f5f5] hover:bg-[#efefef]'"
                   [style.animation-delay.ms]="140 + i * 70"
                 >
                   <span class="grid h-3 w-3 shrink-0 place-items-center rounded-full bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.04)]">
@@ -96,6 +111,10 @@
                 </button>
               }
             </div>
+
+            @if (step() === 'method' && error()) {
+              <p class="mt-3 text-[11px] text-red-600" role="alert">{{ error() }}</p>
+            }
 
             <div
               class="mt-auto flex animate-[tfa-item-in_450ms_cubic-bezier(0.22,0.61,0.36,1)_both] items-center justify-center gap-3 pt-8 motion-reduce:animate-none"
@@ -111,14 +130,50 @@
               <button
                 type="button"
                 (click)="next()"
+                [disabled]="busy()"
                 class="h-[34px] w-[130px] cursor-pointer rounded-[10px] bg-[#f5f5f5] text-xs text-[#444] outline-none transition-all duration-200 hover:bg-[#62b9c8] hover:text-white hover:shadow-[0_8px_14px_-6px_rgba(70,148,164,0.7)] focus-visible:ring-2 focus-visible:ring-[#4694A4]/40 active:scale-95 motion-reduce:transition-none"
+              >
+                {{ busy() ? 'Sending…' : 'Next' }}
+              </button>
+            </div>
+          </section>
+
+          <!-- ===== Step 2 (Google Authenticator only): scan the QR code ===== -->
+          <section
+            class="flex w-full shrink-0 flex-col transition-opacity duration-300 motion-reduce:transition-none"
+            [class]="step() === 'qr' ? 'opacity-100' : 'opacity-0'"
+            [attr.inert]="step() === 'qr' ? null : ''"
+            [attr.aria-hidden]="step() !== 'qr'"
+          >
+            <p class="text-xs text-[#555]">Scan this QR code with Google Authenticator</p>
+
+            <div class="mt-4 flex flex-col items-center gap-3">
+              @if (qrDataUrl()) {
+                <img [src]="qrDataUrl()" width="160" height="160" alt="QR code for Google Authenticator" class="rounded-lg bg-white p-1 shadow-[0_0_0_1px_rgba(0,0,0,0.06)]" />
+              }
+              <p class="text-center text-[10px] text-[#777]">Can't scan? In the app choose "Enter a setup key" and type:</p>
+              <code class="select-all rounded-md bg-[#f5f5f5] px-3 py-1.5 text-[11px] tracking-wider text-[#444]">{{ manualKey() }}</code>
+            </div>
+
+            <div class="mt-auto flex items-center justify-center gap-3 pt-6">
+              <button
+                type="button"
+                (click)="close()"
+                class="h-[34px] w-[130px] cursor-pointer rounded-[10px] bg-[#f5f5f5] text-xs text-[#444] outline-none transition-all duration-200 hover:bg-[#ebebeb] focus-visible:ring-2 focus-visible:ring-[#4694A4]/40 active:scale-95 motion-reduce:transition-none"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                (click)="qrScanned()"
+                class="h-[34px] w-[130px] cursor-pointer rounded-[10px] bg-[#62b9c8] text-xs text-white outline-none transition-all duration-200 hover:bg-[#4694A4] focus-visible:ring-2 focus-visible:ring-[#4694A4]/40 active:scale-95 motion-reduce:transition-none"
               >
                 Next
               </button>
             </div>
           </section>
 
-          <!-- ===== Step 2: verify OTP ===== -->
+          <!-- ===== Step 3: verify the code ===== -->
           <section
             class="flex w-full shrink-0 flex-col transition-opacity duration-300 motion-reduce:transition-none"
             [class]="step() === 'otp' ? 'opacity-100' : 'opacity-0'"
@@ -126,6 +181,11 @@
             [attr.aria-hidden]="step() !== 'otp'"
           >
             <p class="text-xs text-[#555]">Verify OTP</p>
+            @if (usesAuthenticator()) {
+              <p class="mt-1 text-[11px] text-[#777]">Enter the 6-digit code from your Google Authenticator app</p>
+            } @else if (maskedEmail()) {
+              <p class="mt-1 text-[11px] text-[#777]">We sent a 6-digit code to {{ maskedEmail() }}</p>
+            }
 
             <!-- OTP field + Verify -->
             <div class="mt-6 flex h-[42px] items-center rounded-xl bg-[#f5f5f5] pl-9 pr-2 transition-shadow duration-200 focus-within:shadow-[inset_0_0_0_2px_#62b9c8]">
@@ -165,13 +225,14 @@
             </div>
 
             <!-- Resend OTP -->
-            <div class="mt-2 flex justify-end pr-2 text-[10px]">
-              @if (!verified()) {
+            <div class="mt-2 flex items-start justify-between gap-3 pr-2 text-[10px]">
+              <p class="min-h-[14px] pl-1 text-red-600" role="alert">{{ step() === 'otp' ? error() : '' }}</p>
+              @if (!verified() && !usesAuthenticator()) {
                 <button
                   type="button"
                   (click)="resend()"
-                  [disabled]="cooldown() > 0"
-                  class="rounded px-0.5 outline-none transition-opacity duration-200 focus-visible:ring-2 focus-visible:ring-[#ff5a5f]/40 motion-reduce:transition-none"
+                  [disabled]="cooldown() > 0 || busy()"
+                  class="shrink-0 rounded px-0.5 outline-none transition-opacity duration-200 focus-visible:ring-2 focus-visible:ring-[#ff5a5f]/40 motion-reduce:transition-none"
                   [class]="cooldown() > 0 ? 'cursor-not-allowed text-[#ff5a5f]/50' : 'cursor-pointer text-[#ff5a5f] hover:underline'"
                 >
                   {{ cooldown() > 0 ? 'Resend OTP in ' + cooldown() + 's' : 'Resend OTP' }}
@@ -197,7 +258,7 @@
                   ? 'cursor-pointer bg-[#62b9c8] text-white hover:bg-[#4694A4] hover:shadow-[0_8px_14px_-6px_rgba(70,148,164,0.7)] active:scale-95'
                   : 'cursor-not-allowed bg-[#f5f5f5] text-[#444]/60'"
               >
-                Save
+                Done
               </button>
             </div>
           </section>
