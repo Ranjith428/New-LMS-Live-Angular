@@ -192,7 +192,12 @@
                     maxlength="50"
                     class="gateway-input" placeholder="First Name"
                     formControlName="firstName"
+                    [attr.aria-invalid]="cardForm.controls.firstName.value.length >= 50"
+                    [attr.aria-describedby]="cardForm.controls.firstName.value.length >= 50 ? 'card-first-name-error' : null"
                   />
+                  @if (cardForm.controls.firstName.value.length >= 50) {
+                    <span id="card-first-name-error" class="gateway-error">Maximum Length 50 Characters.</span>
+                  }
                 </label>
                 <label class="pm-span-2">
                   <span class="sr-only">Last Name</span>
@@ -202,7 +207,12 @@
                     maxlength="50"
                     class="gateway-input" placeholder="Last Name"
                     formControlName="lastName"
+                    [attr.aria-invalid]="cardForm.controls.lastName.value.length >= 50"
+                    [attr.aria-describedby]="cardForm.controls.lastName.value.length >= 50 ? 'card-last-name-error' : null"
                   />
+                  @if (cardForm.controls.lastName.value.length >= 50) {
+                    <span id="card-last-name-error" class="gateway-error">Maximum Length 50 Characters.</span>
+                  }
                 </label>
               </div>
               <button
@@ -340,16 +350,19 @@
 
               <label class="sm:col-start-1 sm:col-span-2">
                 <span class="sr-only">First Name</span>
-                <input type="text" autocomplete="given-name" maxlength="50" placeholder="First name" class="gateway-input" formControlName="firstName" />
+                <input type="text" autocomplete="given-name" maxlength="50" placeholder="First name" class="gateway-input" formControlName="firstName" [attr.aria-invalid]="!!controlError('firstName')" [attr.aria-describedby]="controlError('firstName') ? 'billing-first-name-error' : null" />
+                @if (controlError('firstName'); as error) { <span id="billing-first-name-error" class="gateway-error">{{ error }}</span> }
               </label>
               <label class="sm:col-span-2">
                 <span class="sr-only">Last Name</span>
-                <input type="text" autocomplete="family-name" maxlength="50" placeholder="Last name" class="gateway-input" formControlName="lastName" />
+                <input type="text" autocomplete="family-name" maxlength="50" placeholder="Last name" class="gateway-input" formControlName="lastName" [attr.aria-invalid]="!!controlError('lastName')" [attr.aria-describedby]="controlError('lastName') ? 'billing-last-name-error' : null" />
+                @if (controlError('lastName'); as error) { <span id="billing-last-name-error" class="gateway-error">{{ error }}</span> }
               </label>
 
               <label class="sm:col-span-2">
                 <span class="sr-only">Company Name</span>
-                <input type="text" autocomplete="organization" maxlength="100" placeholder="Company Name" class="gateway-input" formControlName="companyName" />
+                <input type="text" autocomplete="organization" maxlength="100" placeholder="Company Name" class="gateway-input" formControlName="companyName" [attr.aria-invalid]="!!controlError('companyName')" [attr.aria-describedby]="controlError('companyName') ? 'billing-company-name-error' : null" />
+                @if (controlError('companyName'); as error) { <span id="billing-company-name-error" class="gateway-error">{{ error }}</span> }
               </label>
 
               <label class="sm:col-span-6">
@@ -363,7 +376,7 @@
                   placeholder=" "
                   class="gateway-input peer"
                   formControlName="address"
-                  [attr.aria-invalid]="billingForm.controls.address.touched && billingForm.controls.address.invalid"
+                  [attr.aria-invalid]="!!controlError('address')"
                   [attr.aria-describedby]="controlError('address') ? 'billing-address-error' : null"
                 /><span class="pointer-events-none absolute left-5 top-1/2 hidden -translate-y-1/2 text-xs text-[#b3b3b3] peer-placeholder-shown:block" aria-hidden="true">Billing Address<span class="text-red-500">*</span></span></span>
                 @if (controlError('address'); as error) {
@@ -382,7 +395,7 @@
                   placeholder=" "
                   class="gateway-input peer"
                   formControlName="city"
-                  [attr.aria-invalid]="billingForm.controls.city.touched && billingForm.controls.city.invalid"
+                  [attr.aria-invalid]="!!controlError('city')"
                   [attr.aria-describedby]="controlError('city') ? 'billing-city-error' : null"
                 /><span class="pointer-events-none absolute left-5 top-1/2 hidden -translate-y-1/2 text-xs text-[#b3b3b3] peer-placeholder-shown:block" aria-hidden="true">City<span class="text-red-500">*</span></span></span>
                 @if (controlError('city'); as error) {
@@ -396,11 +409,11 @@
                   type="text"
                   autocomplete="postal-code"
                   required
-                  maxlength="100"
+                  maxlength="20"
                   placeholder=" "
                   class="gateway-input peer"
                   formControlName="postalCode"
-                  [attr.aria-invalid]="billingForm.controls.postalCode.touched && billingForm.controls.postalCode.invalid"
+                  [attr.aria-invalid]="!!controlError('postalCode')"
                   [attr.aria-describedby]="controlError('postalCode') ? 'billing-postal-code-error' : null"
                 /><span class="pointer-events-none absolute left-5 top-1/2 hidden -translate-y-1/2 text-xs text-[#b3b3b3] peer-placeholder-shown:block" aria-hidden="true">Postal Code<span class="text-red-500">*</span></span></span>
                 @if (controlError('postalCode'); as error) {
@@ -410,7 +423,8 @@
 
               <label class="sm:col-span-2">
                 <span class="sr-only">State</span>
-                <input type="text" autocomplete="address-level1" maxlength="100" placeholder="State" class="gateway-input" formControlName="state" />
+                <input type="text" autocomplete="address-level1" maxlength="100" placeholder="State" class="gateway-input" formControlName="state" [attr.aria-invalid]="!!controlError('state')" [attr.aria-describedby]="controlError('state') ? 'billing-state-error' : null" />
+                @if (controlError('state'); as error) { <span id="billing-state-error" class="gateway-error">{{ error }}</span> }
               </label>
             </div>
 
@@ -602,7 +616,7 @@
       } @else if (activeModal === 'paypal') {
         <h2 id="paypal-login-title" class="text-lg font-semibold text-[#414749]">Log in to PayPal</h2>
         <p class="mt-1 text-[11px] text-[#6d7476]">UI preview only. PayPal authentication is not connected.</p>
-        <form class="mt-4 space-y-3" [formGroup]="paypalForm" (ngSubmit)="continuePaypal()">
+        <form class="paypal-login-form mt-4 space-y-3" [formGroup]="paypalForm" (ngSubmit)="continuePaypal()">
           @if (paypalStep() === 'email') {
             <label class="block">
               <span class="mb-1.5 block text-[10px] font-medium text-[#545b5d]">Email or Mobile Number <span class="text-red-600" aria-hidden="true">*</span></span>

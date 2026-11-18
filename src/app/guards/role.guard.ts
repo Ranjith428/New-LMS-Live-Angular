@@ -50,13 +50,17 @@ export const roleGuard =
  * package or an edited role takes effect without logging in again. If that call fails (offline) the
  * cached permissions are used - the backend still rejects anything not allowed.
  */
-export const adminAreaGuard: CanActivateFn = () => {
+export const adminAreaGuard: CanActivateFn = (_route, state) => {
   const auth = inject(AuthService);
   const router = inject(Router);
 
   const user = auth.user();
   if (!user) return router.createUrlTree(['/auth']);
-  if (user.role === 'SUPER_ADMIN') return router.createUrlTree([homeRouteFor(user)]);
+  if (user.role === 'SUPER_ADMIN' && state.url !== '/admin-dashboard/edit-profile') {
+    return router.createUrlTree([homeRouteFor(user)]);
+  }
+
+  if (user.role === 'SUPER_ADMIN') return true;
 
   return auth.refreshPermissions().pipe(
     map(() => true),

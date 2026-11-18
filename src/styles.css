@@ -337,7 +337,8 @@
 
 /* Validation text stays small and under the field */
 .pm-body span.gateway-error,
-.pm-billing span.gateway-error {
+.pm-billing span.gateway-error,
+.paypal-login-form span.gateway-error {
   display: block;
   margin-top: 6px;
   font-size: 10px;
@@ -371,4 +372,5 @@ app-payment-gateway #discount-code {
 }
 app-payment-gateway #discount-code::placeholder { color: #b3b3b3; }
 app-payment-gateway #discount-code:focus { outline: none; box-shadow: inset 0 0 0 2px #319eaf; border-radius: 14px; }
+
 
