@@ -233,9 +233,6 @@
     Settings
   </a>
 }
-
-
-            
             <button
               type="button"
               role="menuitem"
@@ -279,7 +276,7 @@
     <!-- Icon nav, placed on top of the curve.
          Built from ADMIN_MENU (config/admin-menu.ts) and filtered by the user's package / role. -->
     <nav
-      class="fixed left-0 top-16 z-10 hidden h-[calc(100vh-4rem)] w-[clamp(48px,4.5vw,84px)] flex-col items-center justify-center gap-8 sm:flex"
+      class="fixed left-0 top-16 z-10 hidden h-[calc(100vh-4rem)] w-[clamp(48px,4.5vw,84px)] flex-col items-center justify-center gap-6 sm:flex"
       aria-label="Main menu"
     >
       @for (item of menuItems(); track item.id) {
@@ -305,6 +302,12 @@
               </svg>
             }
             @case ('course') {
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+              </svg>
+            }
+             @case ('reports') {
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
                 <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>

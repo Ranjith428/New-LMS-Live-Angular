@@ -262,6 +262,20 @@ export const routes: Routes = [
   title: 'Edit Profile',
 },
 
+{
+  path: 'course-report',
+  loadComponent: () =>
+  import('./report/course-report/course-report').then((m) => m.CourseReport),
+  title: 'Course Report',
+ },
+
+ {
+  path: 'learner-report',
+  loadComponent: () =>
+  import('./report/learner-report/learner-report').then((m) => m.LearnerReport),
+  title: 'Learner Report',
+ },
+
 // NEW - Change Password (opens as a modal dialog on top of the dashboard)
 {
   path: 'change-password',
